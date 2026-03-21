@@ -25,7 +25,7 @@ Gemini Vision APIを使用した店舗テント張替シミュレーションツ
    - `GEMINI_API_KEY`
    - `APP_PASSWORD`
 
-## 使い方
+## 使い方 
 
 1. https://あなたのvercel.app にアクセス
 2. パスワード入力
