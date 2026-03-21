@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>テント自動張替シミュレーター - Gemini Vision版</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: 'Helvetica Neue', Arial, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px; 
+            min-height: 100vh;
+        }
+        .container { 
+            max-width: 900px; 
+            margin: auto; 
+            background: white; 
+            padding: 30px; 
+            border-radius: 20px; 
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3); 
+        }
+        h1 { 
+            font-size: 1.8rem; 
+            color: #333; 
+            text-align: center; 
+            margin-bottom: 10px; 
+            font-weight: 700;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 30px;
+        }
+        label { 
+            font-size: 0.85rem; 
+            color: #444; 
+            font-weight: 600; 
+            display: block;
+            margin-top: 15px;
+        }
+        input, select, button { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 8px 0 15px 0; 
+            border: 2px solid #e0e0e0; 
+            border-radius: 10px; 
+            font-size: 1rem; 
+            box-sizing: border-box;
+            transition: border 0.3s;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; 
+            border: none; 
+            cursor: pointer; 
+            font-weight: 600;
+            font-size: 1.1rem;
+            padding: 15px;
+            margin-top: 20px;
+            transition: all 0.3s;
+        }
+        button:hover { 
+            opacity: 0.9;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .canvas-wrapper {
+            margin: 30px 0;
+            text-align: center;
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 15px;
+        }
+        canvas { 
+            max-width: 100%; 
+            border: 3px solid #ddd; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        #status { 
+            padding: 15px; 
+            border-radius: 10px; 
+            margin: 20px 0; 
+            font-size: 0.95rem;
+            display: none;
+        }
+        #status.show {
+            display: block;
+        }
+        #status.info {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            color: #856404;
+        }
+        #status.success {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            color: #155724;
+        }
+        #status.error {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+            color: #721c24;
+        }
+        .info-box {
+            background: #e7f3ff;
+            padding: 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+            border-left: 4px solid #2196F3;
+        }
+        .info-box h3 {
+            margin-top: 0;
+            color: #1976D2;
+            font-size: 1.1rem;
+        }
+        .info-box ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .info-box li {
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .btn-group button {
+            flex: 1;
+        }
+        .btn-secondary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🎪 テント自動張替シミュレーター</h1>
+    <div class="subtitle">Gemini Vision AI - 完全自動認識版</div>
+
+    <div class="info-box">
+        <h3>📋 使い方</h3>
+        <ol>
+            <li><strong>パスワード</strong>を入力（社内用）</li>
+            <li><strong>生地を選択</strong>してください</li>
+            <li><strong>店舗写真をアップロード</strong></li>
+            <li><strong>「AI自動検出＆張替」</strong>をクリック</li>
+            <li>AIがテント部分を自動認識し、選択した生地で張替イメージを生成します</li>
+        </ol>
+    </div>
+
+    <label>🔐 パスワード</label>
+    <input type="password" id="password" placeholder="社内パスワードを入力">
+
+    <label>🎨 生地を選択</label>
+    <select id="fabricSelect">
+        <option>生地データ読み込み中...</option>
+    </select>
+
+    <label>📸 店舗写真をアップロード</label>
+    <input type="file" id="upload" accept="image/*">
+
+    <button id="detectBtn" onclick="detectAndReplace()" disabled>
+        🤖 AI自動検出＆張替
+    </button>
+
+    <div id="status"></div>
+
+    <div class="canvas-wrapper" id="canvasWrapper" style="display:none;">
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <div class="btn-group" id="actionButtons" style="display:none;">
+        <button onclick="downloadImage()" class="btn-success">💾 画像をダウンロード</button>
+        <button onclick="reset()" class="btn-secondary">🔄 リセット</button>
+    </div>
+</div>
+
+<script>
+
+/* =========================
+   設定
+========================= */
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQyMy5PUSJjr1f_fnQIpRIUagAp8Dw7Hqckr9422w_459qgQ_j4Bhw4LWygLVWTURa9n4Xl_gBNHAie/pub?output=csv";
+const API_URL = "VERCEL_URL_PLACEHOLDER/api/detect-tent";
+
+/* =========================
+   グローバル変数
+========================= */
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let originalImage = null;
+let fabricDatabase = [];
+let detectedPolygon = null;
+
+/* =========================
+   ステータス表示
+========================= */
+function showStatus(message, type = 'info') {
+    const status = document.getElementById('status');
+    status.textContent = message;
+    status.className = `show ${type}`;
+}
+
+function hideStatus() {
+    const status = document.getElementById('status');
+    status.className = '';
+}
+
+/* =========================
+   CSV読み込み（生地マスター）
+========================= */
+fetch(CSV_URL)
+    .then(res => res.text())
+    .then(text => {
+        const rows = text.trim().split("\n").slice(1);
+        const select = document.getElementById("fabricSelect");
+        select.innerHTML = "";
+
+        rows.forEach((row, index) => {
+            if (!row.trim()) return;
+            const cols = row.split(",");
+            
+            const fabric = {
+                maker: cols[0],
+                name: cols[1],
+                code: cols[2],
+                color: cols[3],
+                r: cols[4],
+                g: cols[5],
+                b: cols[6]
+            };
+
+            fabricDatabase.push(fabric);
+
+            const hasRGB = fabric.r && fabric.g && fabric.b;
+            if (!hasRGB) return;
+
+            const option = document.createElement("option");
+            option.textContent = `${fabric.maker} ${fabric.name} ${fabric.code} - ${fabric.color}`;
+            option.value = index;
+            select.appendChild(option);
+        });
+
+        showStatus('✅ 生地データを読み込みました', 'success');
+        setTimeout(hideStatus, 3000);
+    })
+    .catch(err => {
+        showStatus('❌ 生地データの読み込みに失敗しました', 'error');
+    });
+
+/* =========================
+   画像アップロード
+========================= */
+document.getElementById("upload").onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const img = new Image();
+    img.onload = () => {
+        const maxWidth = 800;
+        const scale = img.width > maxWidth ? maxWidth / img.width : 1;
+        
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+
+        originalImage = img;
+        detectedPolygon = null;
+
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        document.getElementById('canvasWrapper').style.display = 'block';
+        document.getElementById('detectBtn').disabled = false;
+        
+        showStatus('📸 画像を読み込みました。AI検出を実行してください', 'success');
+    };
+
+    img.src = URL.createObjectURL(file);
+};
+
+/* =========================
+   画像をBase64に変換
+========================= */
+function imageToBase64(img) {
+    const tempCanvas = document.createElement('canvas');
+    const maxWidth = 800;
+    const scale = img.width > maxWidth ? maxWidth / img.width : 1;
+    
+    tempCanvas.width = img.width * scale;
+    tempCanvas.height = img.height * scale;
+    
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.drawImage(img, 0, 0, tempCanvas.width, tempCanvas.height);
+    return tempCanvas.toDataURL('image/jpeg', 0.9).split(',')[1];
+}
+
+/* =========================
+   AI検出＆張替実行
+========================= */
+async function detectAndReplace() {
+    const password = document.getElementById('password').value;
+    const selectedIndex = document.getElementById('fabricSelect').value;
+
+    if (!password) {
+        showStatus('❌ パスワードを入力してください', 'error');
+        return;
+    }
+
+    if (!originalImage) {
+        showStatus('❌ 画像をアップロードしてください', 'error');
+        return;
+    }
+
+    if (!selectedIndex || selectedIndex === '') {
+        showStatus('❌ 生地を選択してください', 'error');
+        return;
+    }
+
+    const fabric = fabricDatabase[selectedIndex];
+    
+    showStatus('🔄 AIがテント部分を解析中...（20-30秒かかります）', 'info');
+    document.getElementById('detectBtn').disabled = true;
+
+    try {
+        const base64Image = imageToBase64(originalImage);
+
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                password: password,
+                imageBase64: base64Image,
+                fabricData: fabric
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'API Error');
+        }
+
+        if (result.success && result.polygon) {
+            detectedPolygon = result.polygon;
+            showStatus('✅ テント部分を検出しました！張替イメージを生成中...', 'success');
+            
+            // 張替適用
+            applyFabricToPolygon(fabric);
+            
+            document.getElementById('actionButtons').style.display = 'flex';
+            showStatus('✅ 完成しました！', 'success');
+        } else {
+            throw new Error('座標データが取得できませんでした');
+        }
+
+    } catch (error) {
+        showStatus('❌ エラー: ' + error.message, 'error');
+        console.error('Detection Error:', error);
+    } finally {
+        document.getElementById('detectBtn').disabled = false;
+    }
+}
+
+/* =========================
+   ポリゴンに生地を適用
+========================= */
+function applyFabricToPolygon(fabric) {
+    if (!detectedPolygon || detectedPolygon.length < 3) return;
+
+    // 元画像を描画
+    ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
+
+    // 座標をキャンバスサイズに合わせてスケール
+    const scaleX = canvas.width / (originalImage.width);
+    const scaleY = canvas.height / (originalImage.height);
+
+    // ポリゴンパスを作成
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(detectedPolygon[0].x * scaleX, detectedPolygon[0].y * scaleY);
+    
+    for (let i = 1; i < detectedPolygon.length; i++) {
+        ctx.lineTo(detectedPolygon[i].x * scaleX, detectedPolygon[i].y * scaleY);
+    }
+    
+    ctx.closePath();
+    ctx.clip();
+
+    // 生地色を適用（multiply合成）
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = `rgb(${fabric.r}, ${fabric.g}, ${fabric.b})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.restore();
+
+    // 境界線を描画
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(detectedPolygon[0].x * scaleX, detectedPolygon[0].y * scaleY);
+    
+    for (let i = 1; i < detectedPolygon.length; i++) {
+        ctx.lineTo(detectedPolygon[i].x * scaleX, detectedPolygon[i].y * scaleY);
+    }
+    
+    ctx.closePath();
+    ctx.stroke();
+}
+
+/* =========================
+   画像ダウンロード
+========================= */
+function downloadImage() {
+    const link = document.createElement('a');
+    const timestamp = new Date().toISOString().slice(0,10);
+    link.download = `tent_simulation_${timestamp}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    
+    showStatus('💾 画像を保存しました', 'success');
+    setTimeout(hideStatus, 3000);
+}
+
+/* =========================
+   リセット
+========================= */
+function reset() {
+    originalImage = null;
+    detectedPolygon = null;
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    document.getElementById('upload').value = '';
+    document.getElementById('canvasWrapper').style.display = 'none';
+    document.getElementById('actionButtons').style.display = 'none';
+    document.getElementById('detectBtn').disabled = true;
+    
+    hideStatus();
+}
+
+</script>
+
+</body>
+</html>

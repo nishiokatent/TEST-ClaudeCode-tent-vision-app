@@ -19,9 +19,5 @@
       "src": "/(.*)",
       "dest": "/public/$1"
     }
-  ],
-  "env": {
-    "GEMINI_API_KEY": "@gemini-api-key",
-    "APP_PASSWORD": "@app-password"
-  }
+  ]
 }
