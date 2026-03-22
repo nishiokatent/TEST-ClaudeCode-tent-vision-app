@@ -10,16 +10,44 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
+  // ★ 環境変数の存在確認（エラーを早期に返す）
+  const apiKey = process.env.OPENAI_API_KEY;
+  const appPassword = process.env.APP_PASSWORD;
+
+  if (!apiKey) {
+    console.error('OPENAI_API_KEY is not set');
+    return res.status(500).json({
+      success: false,
+      error: '環境変数 OPENAI_API_KEY が設定されていません。Vercelの環境変数を確認してください。'
+    });
+  }
+
+  if (!appPassword) {
+    console.error('APP_PASSWORD is not set');
+    return res.status(500).json({
+      success: false,
+      error: '環境変数 APP_PASSWORD が設定されていません。Vercelの環境変数を確認してください。'
+    });
+  }
+
   // リクエストデータの解析
   let body = req.body;
   if (typeof body === 'string') {
-    body = JSON.parse(body);
+    try {
+      body = JSON.parse(body);
+    } catch (e) {
+      return res.status(400).json({ success: false, error: 'リクエストのJSONが不正です' });
+    }
+  }
+
+  if (!body) {
+    return res.status(400).json({ success: false, error: 'リクエストボディが空です' });
   }
 
   const { password, imageBase64, fabricData } = body;
 
   // 認証チェック
-  if (password !== process.env.APP_PASSWORD) {
+  if (password !== appPassword) {
     return res.status(401).json({
       success: false,
       error: 'パスワードが正しくありません'
@@ -34,10 +62,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    // OpenAI クライアント初期化
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
+    // OpenAI クライアント初期化（apiKeyを変数から明示的に渡す）
+    const openai = new OpenAI({ apiKey });
 
     // プロンプト
     const prompt = `
