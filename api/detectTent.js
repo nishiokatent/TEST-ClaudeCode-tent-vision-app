@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 
 export default async function handler(req, res) {
   // CORS設定
@@ -20,25 +20,26 @@ export default async function handler(req, res) {
 
   // 認証チェック
   if (password !== process.env.APP_PASSWORD) {
-    return res.status(401).json({ 
-      success: false, 
-      error: 'パスワードが正しくありません' 
+    return res.status(401).json({
+      success: false,
+      error: 'パスワードが正しくありません'
     });
   }
 
   if (!imageBase64) {
-    return res.status(400).json({ 
-      success: false, 
-      error: '画像データが必要です' 
+    return res.status(400).json({
+      success: false,
+      error: '画像データが必要です'
     });
   }
 
   try {
-    // Gemini API初期化
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+    // OpenAI クライアント初期化
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
 
-    // プロンプト作成
+    // プロンプト
     const prompt = `
 あなたは画像解析の専門家です。
 この画像から「店舗の入口テント（日よけ・雨よけテント）」部分を正確に検出してください。
@@ -69,20 +70,32 @@ polygonは時計回りまたは反時計回りに並べてください。
 confidenceは0.0から1.0の範囲で、検出の信頼度を表します。
 `;
 
-    // 画像データの準備
-    const imagePart = {
-      inlineData: {
-        data: imageBase64,
-        mimeType: 'image/jpeg'
-      }
-    };
+    // OpenAI Vision APIにリクエスト
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      max_tokens: 1000,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: prompt,
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:image/jpeg;base64,${imageBase64}`,
+                detail: 'high',
+              },
+            },
+          ],
+        },
+      ],
+    });
 
-    // Gemini APIにリクエスト
-    const result = await model.generateContent([prompt, imagePart]);
-    const response = await result.response;
-    const text = response.text();
-
-    console.log('Gemini Response:', text);
+    const text = response.choices[0].message.content;
+    console.log('OpenAI Response:', text);
 
     // JSONパース
     let parsedData;
@@ -112,14 +125,14 @@ confidenceは0.0から1.0の範囲で、検出の信頼度を表します。
       confidence: parsedData.confidence || 0.9,
       imageWidth: parsedData.imageWidth,
       imageHeight: parsedData.imageHeight,
-      fabricData: fabricData
+      fabricData: fabricData,
     });
 
   } catch (error) {
-    console.error('Gemini API Error:', error);
+    console.error('OpenAI API Error:', error);
     return res.status(500).json({
       success: false,
-      error: 'AI解析エラー: ' + error.message
+      error: 'AI解析エラー: ' + error.message,
     });
   }
 }
