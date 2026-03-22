@@ -122,4 +122,4 @@ confidenceは0.0から1.0の範囲で、検出の信頼度を表します。
       error: 'AI解析エラー: ' + error.message
     });
   }
-}
+} 
