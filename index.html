@@ -711,14 +711,15 @@ function boostedColor(r, g, b, blendVal) {
    CONTRAST HELPER — iOS Safariはfilter+clipが効かないため
    オフスクリーンcanvasで先にコントラスト処理する
 ============================================================ */
-function makeContrastedImage(src, ct, sw, sh, dx, dy, dw, dh) {
+function makeContrastedImage(src, ct) {
   // ct=1.0なら処理不要
   if (Math.abs(ct - 1.0) < 0.01) return null;
   const tmp = document.createElement('canvas');
-  tmp.width  = dw; tmp.height = dh;
+  tmp.width  = src.width;
+  tmp.height = src.height;
   const tc = tmp.getContext('2d');
   tc.filter = `contrast(${ct})`;
-  tc.drawImage(src, dx, dy, dw, dh, 0, 0, dw, dh);
+  tc.drawImage(src, 0, 0);
   tc.filter = 'none';
   return tmp;
 }
@@ -751,8 +752,7 @@ function render() {
     const ct = 1 + contrast / 100;
 
     // コントラスト処理済みの画像を用意（iOS対応：filter+clipを避ける）
-    const contrastedImg = makeContrastedImage(srcImg, ct,
-      srcImg.width, srcImg.height, 0, 0, iw, ih);
+    const contrastedImg = makeContrastedImage(srcImg, ct);
 
     vctx.save();
     vctx.beginPath();
@@ -1417,8 +1417,7 @@ function renderOffscreen() {
     const ct = 1 + contrast / 100;
 
     // オフスクリーンでコントラスト処理
-    const contrastedImg = makeContrastedImage(srcImg, ct,
-      srcImg.width, srcImg.height, 0, 0, srcImg.width, srcImg.height);
+    const contrastedImg = makeContrastedImage(srcImg, ct);
 
     oc.save();
     oc.beginPath();
