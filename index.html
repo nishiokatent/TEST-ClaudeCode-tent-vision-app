@@ -26,6 +26,55 @@
     -webkit-user-select: none;
   }
 
+  /* ── PW LOCK SCREEN ── */
+  #pw-screen {
+    position: fixed; inset: 0; z-index: 200;
+    background: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px;
+  }
+  #pw-screen h2 {
+    font-size: 0.78rem; color: var(--text2); letter-spacing: 0.18em; font-weight: 400;
+  }
+  #pw-row {
+    display: flex; align-items: stretch;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; width: 280px;
+    transition: border-color 0.2s;
+  }
+  #pw-row:focus-within { border-color: var(--accent2); }
+  #pw-row.shake { animation: pwshake 0.3s; border-color: var(--danger); }
+  @keyframes pwshake {
+    0%,100%{transform:translateX(0)} 25%{transform:translateX(-7px)} 75%{transform:translateX(7px)}
+  }
+  #pw-field {
+    flex: 1; background: transparent; border: none; color: var(--text);
+    padding: 13px 16px; font-size: 0.9rem; font-family: inherit;
+    outline: none; letter-spacing: 0.15em; min-width: 0;
+  }
+  #pw-field::placeholder { letter-spacing: 0.04em; color: var(--text2); font-size: 0.8rem; }
+  #pw-submit {
+    background: var(--accent); color: #0f0f0f; border: none;
+    padding: 0 18px; font-size: 0.82rem; font-weight: 700;
+    font-family: inherit; cursor: pointer; letter-spacing: 0.05em;
+    transition: opacity 0.2s; flex-shrink: 0;
+  }
+  #pw-submit:hover { opacity: 0.85; }
+  #pw-error { color: var(--danger); font-size: 0.75rem; min-height: 1.2em; }
+
+  /* ── BEFORE/AFTER overlay ── */
+  #ba-overlay {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    background: rgba(15,15,15,0.9); border: 1px solid var(--accent2);
+    color: var(--accent2); padding: 5px 18px; border-radius: 20px;
+    font-size: 0.72rem; font-family: 'DM Mono', monospace; font-weight: 700;
+    pointer-events: none; opacity: 0; transition: opacity 0.15s; z-index: 10;
+    letter-spacing: 0.1em;
+  }
+  #ba-overlay.show { opacity: 1; }
+
+  /* share button */
+  .btn-share { background: #007aff; color: #fff; }
+
   body {
     font-family: 'Noto Sans JP', sans-serif;
     background: var(--bg);
@@ -220,6 +269,24 @@
 </head>
 <body>
 
+<!-- PW LOCK -->
+<div id="pw-screen">
+  <svg viewBox="0 0 120 120" width="76" height="76" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="60" cy="60" r="56" fill="none" stroke="#c0392b" stroke-width="3.5"/>
+    <circle cx="60" cy="60" r="50" fill="none" stroke="#c0392b" stroke-width="1.2"/>
+    <circle cx="60" cy="60" r="50" fill="rgba(192,57,43,0.07)"/>
+    <text x="60" y="44" text-anchor="middle" dominant-baseline="middle" font-family="'Noto Serif JP','Noto Sans JP',serif" font-size="26" font-weight="700" fill="#c0392b" letter-spacing="4">西岡</text>
+    <line x1="22" y1="60" x2="98" y2="60" stroke="#c0392b" stroke-width="1" opacity="0.5"/>
+    <text x="60" y="80" text-anchor="middle" dominant-baseline="middle" font-family="'Noto Serif JP','Noto Sans JP',serif" font-size="20" font-weight="700" fill="#c0392b" letter-spacing="3">テント</text>
+  </svg>
+  <h2>TENT SIMULATOR</h2>
+  <div id="pw-row">
+    <input type="password" id="pw-field" placeholder="パスワードを入力" autocomplete="current-password">
+    <button id="pw-submit" onclick="checkPW()">→ 入室</button>
+  </div>
+  <div id="pw-error"></div>
+</div>
+
 <header>
   <div class="logo">
   <!-- 落款風ハンコマーク -->
@@ -269,6 +336,19 @@
   </div>
   <div id="status-bar"></div>
   <div id="zoom-indicator">100%</div>
+  <div id="ba-overlay"></div>
+  <button id="before-btn" style="display:none;position:absolute;bottom:12px;left:12px;background:rgba(15,15,15,0.88);border:1px solid rgba(255,255,255,0.25);color:#f0f0f0;padding:7px 16px;border-radius:20px;font-size:0.72rem;font-weight:700;font-family:inherit;cursor:pointer;z-index:10;letter-spacing:0.05em;"
+    onpointerdown="startBefore(event)" onpointerup="endBefore(event)" onpointerleave="endBefore(event)"
+    ontouchstart="startBefore(event)" ontouchend="endBefore(event)">
+    👁 BEFORE
+  </button>
+  <!-- Before/After ボタン -->
+  <button id="before-btn"
+    style="display:none;position:absolute;bottom:12px;left:12px;background:rgba(15,15,15,0.85);border:1px solid rgba(255,255,255,0.2);color:#f0f0f0;padding:6px 14px;border-radius:20px;font-size:0.72rem;font-weight:700;font-family:inherit;cursor:pointer;backdrop-filter:blur(8px);z-index:10;"
+    onpointerdown="startBefore(event)" onpointerup="endBefore(event)" onpointerleave="endBefore(event)"
+    ontouchstart="startBefore(event)" ontouchend="endBefore(event)">
+    👁 BEFORE
+  </button>
 </div>
 
 <div id="bottom-panel">
@@ -280,12 +360,16 @@
 
   <div class="tab-content active" id="tab-draw">
     <div class="hint">
-      📌 タップで頂点追加　　✋ 頂点をドラッグで移動<br>
-      🔍 2本指ピンチでズーム／移動　　🗑 頂点を長押しで削除
+      📌 タップで頂点追加　　✋ 頂点ドラッグで移動　　🗑 長押しで削除<br>
+      🔍 2本指ピンチでズーム　　辺をタップで頂点挿入
+    </div>
+    <div class="ctrl-row">
+      <div id="polygon-tabs" style="display:flex;gap:4px;flex:1;flex-wrap:wrap;"></div>
+      <button class="btn btn-ghost" style="padding:6px 10px;font-size:0.72rem;" onclick="addPolygon()">＋テント</button>
     </div>
     <div class="btn-row">
       <button class="btn btn-ghost"  onclick="undoPoint()">↩ 戻す</button>
-      <button class="btn btn-danger" onclick="clearPoints()">🗑 全消去</button>
+      <button class="btn btn-danger" onclick="clearPoints()">🗑 消去</button>
     </div>
   </div>
 
@@ -319,13 +403,12 @@
   </div>
 
   <div class="tab-content" id="tab-export">
-    <div class="ctrl-row">
-      <label class="ctrl-label">PW</label>
-      <input type="password" id="password" placeholder="社内パスワード（任意）">
-    </div>
     <div class="btn-row">
       <button class="btn btn-success" id="download-btn" onclick="downloadImage()" disabled>💾 保存</button>
-      <button class="btn btn-ghost"   onclick="resetAll()">🔄 リセット</button>
+      <button class="btn btn-share" id="share-btn" onclick="shareImage()" disabled>📤 シェア</button>
+    </div>
+    <div style="margin-top:8px;">
+      <button class="btn btn-ghost" style="width:100%;color:var(--danger);border-color:var(--danger);" onclick="resetAll()">🔄 リセット</button>
     </div>
   </div>
 </div>
@@ -336,6 +419,77 @@
 ============================================================ */
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQyMy5PUSJjr1f_fnQIpRIUagAp8Dw7Hqckr9422w_459qgQ_j4Bhw4LWygLVWTURa9n4Xl_gBNHAie/pub?output=csv";
 const APP_PW  = 'tent2024';
+const LS_KEY  = 'tentSim_v1';
+
+/* ============================================================
+   PW LOCK
+============================================================ */
+function checkPW() {
+  const val = document.getElementById('pw-field').value;
+  if (val === APP_PW) {
+    document.getElementById('pw-screen').style.display = 'none';
+  } else {
+    const row = document.getElementById('pw-row');
+    row.classList.add('shake');
+    document.getElementById('pw-error').textContent = 'パスワードが違います';
+    setTimeout(() => row.classList.remove('shake'), 400);
+  }
+}
+document.getElementById('pw-field').addEventListener('keydown', e => {
+  if (e.key === 'Enter') checkPW();
+});
+
+/* ============================================================
+   BEFORE / AFTER
+============================================================ */
+function startBefore(e) {
+  e.preventDefault();
+  if (!applied) return;
+  showBefore = true;
+  const ov = document.getElementById('ba-overlay');
+  ov.textContent = 'BEFORE';
+  ov.classList.add('show');
+  render();
+}
+function endBefore(e) {
+  e.preventDefault();
+  if (!showBefore) return;
+  showBefore = false;
+  const ov = document.getElementById('ba-overlay');
+  ov.textContent = 'AFTER';
+  setTimeout(() => ov.classList.remove('show'), 800);
+  render();
+}
+
+/* ============================================================
+   LOCALSTORAGE
+============================================================ */
+function saveSettings() {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      blend,
+      contrast,
+      fabricIdx: document.getElementById('fabric-select').value,
+    }));
+  } catch(e) {}
+}
+
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+    if (s.blend !== undefined) {
+      blend = s.blend;
+      document.getElementById('blend-slider').value = Math.round(blend * 100);
+      onBlendChange();
+    }
+    if (s.contrast !== undefined) {
+      contrast = s.contrast;
+      document.getElementById('contrast-slider').value = contrast;
+      onContrastChange();
+    }
+    if (s.fabricIdx) window._restoreFabricIdx = s.fabricIdx;
+  } catch(e) {}
+}
 
 /* ============================================================
    ELEMENTS
@@ -349,30 +503,32 @@ const empty = document.getElementById('empty-state');
    STATE
 ============================================================ */
 let srcImg        = null;
-let points        = [];
-let applied       = false;
+// 複数ポリゴン管理
+let polygons      = [{ points: [], applied: false }]; // 全テント
+let activeIdx     = 0;                                 // 編集中テント
+let applied       = false;  // いずれか1つでも適用済み
 let scale         = 1;
 let offX          = 0;
 let offY          = 0;
 let fabricDB      = [];
 let currentFabric = null;
-let opacity       = 1.0;  // 強度固定（廃止）
-let blend         = 0;    // 0=multiply, 1=source-over
-let contrast      = 0;    // -50〜100（影の強さ）
+let opacity       = 1.0;
+let blend         = 0;
+let contrast      = 0;
+let showBefore    = false;  // Before/After表示フラグ
 
-/* ラベル状態（画像座標系で保持） */
+// アクティブポリゴンのpoints参照
+function pts() { return polygons[activeIdx].points; }
+
+/* ラベル状態 */
 let label = {
   visible: false,
   ix: 0, iy: 0,
   fontSize: 28,
   dragging: false,
-  resizing: false,      // 角ドラッグ中
-  _resizeStartX: 0,
-  _resizeStartY: 0,
-  _resizeFontSize0: 0,
-  pinching: false,
-  pinchDist0: 0,
-  pinchFontSize0: 0,
+  resizing: false,
+  _resizeStartX: 0, _resizeStartY: 0, _resizeFontSize0: 0,
+  pinching: false, pinchDist0: 0, pinchFontSize0: 0,
 };
 
 /* ============================================================
@@ -394,6 +550,7 @@ function resizeCanvas() {
 }
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
+loadSettings();
 
 /* ============================================================
    TABS
@@ -428,6 +585,12 @@ fetch(CSV_URL)
       sel.appendChild(opt);
     });
     showStatus('生地データ読み込み完了', 'success');
+    // 前回の生地を復元
+    if (window._restoreFabricIdx) {
+      document.getElementById('fabric-select').value = window._restoreFabricIdx;
+      onFabricChange();
+      delete window._restoreFabricIdx;
+    }
   })
   .catch(() => showStatus('生地データの読み込みに失敗しました', 'error'));
 
@@ -448,6 +611,7 @@ function onBlendChange() {
   else if (blend < 0.8) val.textContent = '中間';
   else                  val.textContent = '発色';
   if (applied) render();
+  saveSettings();
 }
 
 function onContrastChange() {
@@ -458,6 +622,7 @@ function onContrastChange() {
   else if (contrast < 60) val.textContent = '強め';
   else                    val.textContent = '強調';
   if (applied) render();
+  saveSettings();
 }
 
 /* ============================================================
@@ -559,6 +724,9 @@ function render() {
 
   // 1. Image
   vctx.drawImage(srcImg, offX, offY, iw, ih);
+
+  // Before表示中は元画像のみ
+  if (showBefore) return;
 
   if (points.length === 0) return;
 
@@ -1190,7 +1358,9 @@ function applyFabric() {
     label.visible = true;
   }
   render();
+  document.getElementById('before-btn').style.display = 'block';
   document.getElementById('download-btn').disabled = false;
+  document.getElementById('share-btn').disabled    = false;
   showStatus('生地を適用しました ✓', 'success');
 }
 
@@ -1220,73 +1390,85 @@ function updateApplyBtn() {
 }
 
 /* ============================================================
-   DOWNLOAD — full-res offscreen canvas
+   OFFSCREEN RENDER（保存・シェア共用）
 ============================================================ */
-function downloadImage() {
-  if (!srcImg || !applied) { showStatus('先に生地を適用してください', 'error'); return; }
-  const pw = document.getElementById('password').value;
-  if (pw && pw !== APP_PW) { showStatus('パスワードが正しくありません', 'error'); return; }
-
-  const out  = document.createElement('canvas');
+function renderOffscreen() {
+  const out = document.createElement('canvas');
   out.width  = srcImg.width;
   out.height = srcImg.height;
   const oc   = out.getContext('2d');
-
   oc.drawImage(srcImg, 0, 0);
-
   if (currentFabric && points.length >= 3) {
     const [r, g, b] = boostedColor(currentFabric.r, currentFabric.g, currentFabric.b, blend);
     const ct = 1 + contrast / 100;
-
     oc.save();
     oc.beginPath();
     oc.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i++) oc.lineTo(points[i].x, points[i].y);
     oc.closePath();
     oc.clip();
-
-    // コントラスト適用した元画像を再描画
     oc.filter = `contrast(${ct})`;
     oc.drawImage(srcImg, 0, 0);
     oc.filter = 'none';
-
     if (blend <= 0) {
-      oc.globalCompositeOperation = 'multiply';
-      oc.globalAlpha = opacity;
-      oc.fillStyle = `rgb(${r},${g},${b})`;
-      oc.fillRect(0, 0, srcImg.width, srcImg.height);
+      oc.globalCompositeOperation = 'multiply'; oc.globalAlpha = opacity;
+      oc.fillStyle = `rgb(${r},${g},${b})`; oc.fillRect(0, 0, srcImg.width, srcImg.height);
     } else if (blend >= 1) {
-      oc.globalCompositeOperation = 'source-over';
-      oc.globalAlpha = opacity;
-      oc.fillStyle = `rgb(${r},${g},${b})`;
-      oc.fillRect(0, 0, srcImg.width, srcImg.height);
+      oc.globalCompositeOperation = 'source-over'; oc.globalAlpha = opacity;
+      oc.fillStyle = `rgb(${r},${g},${b})`; oc.fillRect(0, 0, srcImg.width, srcImg.height);
     } else {
-      oc.globalCompositeOperation = 'multiply';
-      oc.globalAlpha = opacity * (1 - blend);
-      oc.fillStyle = `rgb(${r},${g},${b})`;
-      oc.fillRect(0, 0, srcImg.width, srcImg.height);
-      oc.globalCompositeOperation = 'source-over';
-      oc.globalAlpha = opacity * blend;
-      oc.fillStyle = `rgb(${r},${g},${b})`;
-      oc.fillRect(0, 0, srcImg.width, srcImg.height);
+      oc.globalCompositeOperation = 'multiply'; oc.globalAlpha = opacity * (1 - blend);
+      oc.fillStyle = `rgb(${r},${g},${b})`; oc.fillRect(0, 0, srcImg.width, srcImg.height);
+      oc.globalCompositeOperation = 'source-over'; oc.globalAlpha = opacity * blend;
+      oc.fillStyle = `rgb(${r},${g},${b})`; oc.fillRect(0, 0, srcImg.width, srcImg.height);
     }
     oc.restore();
   }
-
-  // ラベルを実寸で描画
   if (label.visible && currentFabric) {
-    // offscreen用に一時的にscale=1, off=(0,0)で描画
-    const _scale = scale, _offX = offX, _offY = offY;
+    const _s = scale, _x = offX, _y = offY;
     scale = 1; offX = 0; offY = 0;
     drawFabricLabel(oc);
-    scale = _scale; offX = _offX; offY = _offY;
+    scale = _s; offX = _x; offY = _y;
   }
+  return out;
+}
 
-  const link    = document.createElement('a');
+/* ============================================================
+   DOWNLOAD
+============================================================ */
+function downloadImage() {
+  if (!srcImg || !applied) { showStatus('先に生地を適用してください', 'error'); return; }
+  const out  = renderOffscreen();
+  const link = document.createElement('a');
   link.download = `tent_sim_${new Date().toISOString().slice(0,10)}.png`;
   link.href     = out.toDataURL('image/png');
   link.click();
   showStatus('保存しました 💾', 'success');
+}
+
+/* ============================================================
+   SHARE
+============================================================ */
+async function shareImage() {
+  if (!srcImg || !applied) { showStatus('先に生地を適用してください', 'error'); return; }
+  const out = renderOffscreen();
+  out.toBlob(async (blob) => {
+    const fname = `tent_sim_${new Date().toISOString().slice(0,10)}.png`;
+    const file  = new File([blob], fname, { type: 'image/png' });
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: '西岡テント 張替シミュレーション' });
+        showStatus('シェアしました', 'success');
+      } catch(e) {
+        if (e.name !== 'AbortError') showStatus('シェアをキャンセルしました', 'info');
+      }
+    } else {
+      // フォールバック：ダウンロード
+      const link = document.createElement('a');
+      link.download = fname; link.href = URL.createObjectURL(blob); link.click();
+      showStatus('画像を保存しました', 'info');
+    }
+  }, 'image/png');
 }
 
 /* ============================================================
@@ -1296,11 +1478,15 @@ function resetAll() {
   srcImg = null; points = []; applied = false;
   scale = 1; offX = 0; offY = 0;
   label.visible = false;
+  showBefore = false;
   empty.style.display = 'flex';
   vctx.clearRect(0, 0, cssW, cssH);
   updatePointCount();
   updateApplyBtn();
   document.getElementById('download-btn').disabled = true;
+  document.getElementById('share-btn').disabled    = true;
+  document.getElementById('before-btn').style.display = 'none';
+  document.getElementById('ba-overlay').classList.remove('show');
   hideStatus();
 }
 
