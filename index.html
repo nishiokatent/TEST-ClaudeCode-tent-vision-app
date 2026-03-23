@@ -384,7 +384,8 @@
     </div>
     <div class="ctrl-row">
       <label class="ctrl-label">影</label>
-      <input type="range" id="contrast-slider" min="-50" max="100" value="0" oninput="onContrastChange()">
+      <input type="range" id="contrast-slider" min="-50" max="100" value="0"
+        oninput="onContrastInput()" onchange="onContrastChange()">
       <div class="range-val" id="contrast-val">標準</div>
     </div>
     <div style="display:flex;justify-content:space-between;font-size:0.62rem;color:var(--text2);margin:-4px 0 8px 56px;padding-right:42px;">
@@ -613,6 +614,17 @@ function onBlendChange() {
   saveSettings();
 }
 
+// スライダー操作中：ラベルだけ更新（重い処理なし）
+function onContrastInput() {
+  contrast = +document.getElementById('contrast-slider').value;
+  const val = document.getElementById('contrast-val');
+  if (contrast < -20)     val.textContent = '弱め';
+  else if (contrast < 20) val.textContent = '標準';
+  else if (contrast < 60) val.textContent = '強め';
+  else                    val.textContent = '強調';
+}
+
+// スライダーを離した時：キャッシュクリア→再描画
 function onContrastChange() {
   contrast = +document.getElementById('contrast-slider').value;
   const val = document.getElementById('contrast-val');
@@ -620,6 +632,9 @@ function onContrastChange() {
   else if (contrast < 20) val.textContent = '標準';
   else if (contrast < 60) val.textContent = '強め';
   else                    val.textContent = '強調';
+  // キャッシュをクリアして再計算
+  _contrastedCache    = null;
+  _contrastedCacheVal = null;
   if (applied) render();
   saveSettings();
 }
