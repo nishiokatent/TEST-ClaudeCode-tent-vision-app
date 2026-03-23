@@ -298,17 +298,20 @@
       </select>
     </div>
     <div class="ctrl-row">
-      <label class="ctrl-label">強度</label>
-      <input type="range" id="opacity-slider" min="10" max="100" value="75" oninput="onOpacityChange()">
-      <div class="range-val" id="opacity-val">75%</div>
-    </div>
-    <div class="ctrl-row">
       <label class="ctrl-label">質感</label>
       <input type="range" id="blend-slider" min="0" max="100" value="0" oninput="onBlendChange()">
       <div class="range-val" id="blend-val">自然</div>
     </div>
     <div style="display:flex;justify-content:space-between;font-size:0.62rem;color:var(--text2);margin:-4px 0 8px 56px;padding-right:42px;">
       <span>← 陰影残す</span><span>発色重視 →</span>
+    </div>
+    <div class="ctrl-row">
+      <label class="ctrl-label">影</label>
+      <input type="range" id="contrast-slider" min="-50" max="100" value="0" oninput="onContrastChange()">
+      <div class="range-val" id="contrast-val">標準</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:0.62rem;color:var(--text2);margin:-4px 0 8px 56px;padding-right:42px;">
+      <span>← 影を弱める</span><span>影を強調 →</span>
     </div>
     <button class="btn btn-primary" style="width:100%;margin-top:4px" id="apply-btn" onclick="applyFabric()" disabled>
       🎨 生地を適用
@@ -353,8 +356,9 @@ let offX          = 0;
 let offY          = 0;
 let fabricDB      = [];
 let currentFabric = null;
-let opacity       = 0.75;
-let blend         = 0;   // 0=multiply, 1=source-over
+let opacity       = 1.0;  // 強度固定（廃止）
+let blend         = 0;    // 0=multiply, 1=source-over
+let contrast      = 0;    // -50〜100（影の強さ）
 
 /* ラベル状態（画像座標系で保持） */
 let label = {
@@ -436,19 +440,23 @@ function onFabricChange() {
   updateApplyBtn();
 }
 
-function onOpacityChange() {
-  opacity = document.getElementById('opacity-slider').value / 100;
-  document.getElementById('opacity-val').textContent = Math.round(opacity * 100) + '%';
-  if (applied) render();
-}
-
 function onBlendChange() {
   blend = document.getElementById('blend-slider').value / 100;
   const val = document.getElementById('blend-val');
-  if (blend < 0.2)       val.textContent = '自然';
-  else if (blend < 0.5)  val.textContent = '中間寄り';
-  else if (blend < 0.8)  val.textContent = '中間';
-  else                   val.textContent = '発色';
+  if (blend < 0.2)      val.textContent = '自然';
+  else if (blend < 0.5) val.textContent = '中間寄り';
+  else if (blend < 0.8) val.textContent = '中間';
+  else                  val.textContent = '発色';
+  if (applied) render();
+}
+
+function onContrastChange() {
+  contrast = +document.getElementById('contrast-slider').value;
+  const val = document.getElementById('contrast-val');
+  if (contrast < -20)     val.textContent = '弱め';
+  else if (contrast < 20) val.textContent = '標準';
+  else if (contrast < 60) val.textContent = '強め';
+  else                    val.textContent = '強調';
   if (applied) render();
 }
 
@@ -558,11 +566,10 @@ function render() {
   const sx = p => p.x * scale + offX;
   const sy = p => p.y * scale + offY;
 
-  // 2. Fabric fill（ハイブリッド合成 + 彩度連動）
+  // 2. Fabric fill（ハイブリッド合成 + 彩度連動 + コントラスト）
   if (applied && currentFabric && points.length >= 3) {
     const [r, g, b] = boostedColor(currentFabric.r, currentFabric.g, currentFabric.b, blend);
 
-    // クリッピングパスを作成
     vctx.save();
     vctx.beginPath();
     vctx.moveTo(sx(points[0]), sy(points[0]));
@@ -570,6 +577,15 @@ function render() {
     vctx.closePath();
     vctx.clip();
 
+    // コントラストフィルター（影の強弱）
+    const ct = 1 + contrast / 100; // -50→0.5, 0→1.0, 100→2.0
+    vctx.filter = `contrast(${ct})`;
+
+    // 元画像をクリップ内に再描画（コントラスト適用）
+    vctx.drawImage(srcImg, offX, offY, iw, ih);
+    vctx.filter = 'none';
+
+    // 生地色を重ねる
     if (blend <= 0) {
       vctx.globalCompositeOperation = 'multiply';
       vctx.globalAlpha = opacity;
@@ -1220,12 +1236,20 @@ function downloadImage() {
 
   if (currentFabric && points.length >= 3) {
     const [r, g, b] = boostedColor(currentFabric.r, currentFabric.g, currentFabric.b, blend);
+    const ct = 1 + contrast / 100;
+
     oc.save();
     oc.beginPath();
     oc.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i++) oc.lineTo(points[i].x, points[i].y);
     oc.closePath();
     oc.clip();
+
+    // コントラスト適用した元画像を再描画
+    oc.filter = `contrast(${ct})`;
+    oc.drawImage(srcImg, 0, 0);
+    oc.filter = 'none';
+
     if (blend <= 0) {
       oc.globalCompositeOperation = 'multiply';
       oc.globalAlpha = opacity;
