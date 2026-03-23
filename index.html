@@ -302,6 +302,14 @@
       <input type="range" id="opacity-slider" min="10" max="100" value="75" oninput="onOpacityChange()">
       <div class="range-val" id="opacity-val">75%</div>
     </div>
+    <div class="ctrl-row">
+      <label class="ctrl-label">質感</label>
+      <input type="range" id="blend-slider" min="0" max="100" value="0" oninput="onBlendChange()">
+      <div class="range-val" id="blend-val">自然</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:0.62rem;color:var(--text2);margin:-4px 0 8px 56px;padding-right:42px;">
+      <span>← 陰影残す</span><span>発色重視 →</span>
+    </div>
     <button class="btn btn-primary" style="width:100%;margin-top:4px" id="apply-btn" onclick="applyFabric()" disabled>
       🎨 生地を適用
     </button>
@@ -324,7 +332,7 @@
    CONFIG
 ============================================================ */
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQyMy5PUSJjr1f_fnQIpRIUagAp8Dw7Hqckr9422w_459qgQ_j4Bhw4LWygLVWTURa9n4Xl_gBNHAie/pub?output=csv";
-const APP_PW  = 'tent';
+const APP_PW  = 'tent2024';
 
 /* ============================================================
    ELEMENTS
@@ -346,6 +354,7 @@ let offY          = 0;
 let fabricDB      = [];
 let currentFabric = null;
 let opacity       = 0.75;
+let blend         = 0;   // 0=multiply, 1=source-over
 
 /* ============================================================
    CANVAS RESIZE — physical pixels = CSS pixels × DPR
@@ -418,6 +427,16 @@ function onOpacityChange() {
   if (applied) render();
 }
 
+function onBlendChange() {
+  blend = document.getElementById('blend-slider').value / 100;
+  const val = document.getElementById('blend-val');
+  if (blend < 0.2)       val.textContent = '自然';
+  else if (blend < 0.5)  val.textContent = '中間寄り';
+  else if (blend < 0.8)  val.textContent = '中間';
+  else                   val.textContent = '発色';
+  if (applied) render();
+}
+
 /* ============================================================
    IMAGE UPLOAD
 ============================================================ */
@@ -471,18 +490,44 @@ function render() {
   const sx = p => p.x * scale + offX;
   const sy = p => p.y * scale + offY;
 
-  // 2. Fabric fill
+  // 2. Fabric fill（ハイブリッド合成）
   if (applied && currentFabric && points.length >= 3) {
+    const r = currentFabric.r, g = currentFabric.g, b = currentFabric.b;
+
+    // クリッピングパスを作成
     vctx.save();
     vctx.beginPath();
     vctx.moveTo(sx(points[0]), sy(points[0]));
     for (let i = 1; i < points.length; i++) vctx.lineTo(sx(points[i]), sy(points[i]));
     vctx.closePath();
     vctx.clip();
-    vctx.globalCompositeOperation = 'multiply';
-    vctx.globalAlpha = opacity;
-    vctx.fillStyle = `rgb(${currentFabric.r},${currentFabric.g},${currentFabric.b})`;
-    vctx.fillRect(offX, offY, iw, ih);
+
+    if (blend <= 0) {
+      // 純粋multiply
+      vctx.globalCompositeOperation = 'multiply';
+      vctx.globalAlpha = opacity;
+      vctx.fillStyle = `rgb(${r},${g},${b})`;
+      vctx.fillRect(offX, offY, iw, ih);
+    } else if (blend >= 1) {
+      // 純粋source-over
+      vctx.globalCompositeOperation = 'source-over';
+      vctx.globalAlpha = opacity;
+      vctx.fillStyle = `rgb(${r},${g},${b})`;
+      vctx.fillRect(offX, offY, iw, ih);
+    } else {
+      // ハイブリッド：multiplyレイヤー + source-overレイヤーをブレンド
+      // multiplyを(1-blend)の強さで
+      vctx.globalCompositeOperation = 'multiply';
+      vctx.globalAlpha = opacity * (1 - blend);
+      vctx.fillStyle = `rgb(${r},${g},${b})`;
+      vctx.fillRect(offX, offY, iw, ih);
+      // source-overをblendの強さで重ねる
+      vctx.globalCompositeOperation = 'source-over';
+      vctx.globalAlpha = opacity * blend;
+      vctx.fillStyle = `rgb(${r},${g},${b})`;
+      vctx.fillRect(offX, offY, iw, ih);
+    }
+
     vctx.restore();
   }
 
@@ -783,16 +828,33 @@ function downloadImage() {
   oc.drawImage(srcImg, 0, 0);
 
   if (currentFabric && points.length >= 3) {
+    const r = currentFabric.r, g = currentFabric.g, b = currentFabric.b;
     oc.save();
     oc.beginPath();
     oc.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i++) oc.lineTo(points[i].x, points[i].y);
     oc.closePath();
     oc.clip();
-    oc.globalCompositeOperation = 'multiply';
-    oc.globalAlpha = opacity;
-    oc.fillStyle = `rgb(${currentFabric.r},${currentFabric.g},${currentFabric.b})`;
-    oc.fillRect(0, 0, srcImg.width, srcImg.height);
+    if (blend <= 0) {
+      oc.globalCompositeOperation = 'multiply';
+      oc.globalAlpha = opacity;
+      oc.fillStyle = `rgb(${r},${g},${b})`;
+      oc.fillRect(0, 0, srcImg.width, srcImg.height);
+    } else if (blend >= 1) {
+      oc.globalCompositeOperation = 'source-over';
+      oc.globalAlpha = opacity;
+      oc.fillStyle = `rgb(${r},${g},${b})`;
+      oc.fillRect(0, 0, srcImg.width, srcImg.height);
+    } else {
+      oc.globalCompositeOperation = 'multiply';
+      oc.globalAlpha = opacity * (1 - blend);
+      oc.fillStyle = `rgb(${r},${g},${b})`;
+      oc.fillRect(0, 0, srcImg.width, srcImg.height);
+      oc.globalCompositeOperation = 'source-over';
+      oc.globalAlpha = opacity * blend;
+      oc.fillStyle = `rgb(${r},${g},${b})`;
+      oc.fillRect(0, 0, srcImg.width, srcImg.height);
+    }
     oc.restore();
   }
 
