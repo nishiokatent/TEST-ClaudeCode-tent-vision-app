@@ -359,9 +359,13 @@ let blend         = 0;   // 0=multiply, 1=source-over
 /* ラベル状態（画像座標系で保持） */
 let label = {
   visible: false,
-  ix: 0, iy: 0,       // 画像座標での位置
-  fontSize: 28,        // 画像座標でのフォントサイズ
+  ix: 0, iy: 0,
+  fontSize: 28,
   dragging: false,
+  resizing: false,      // 角ドラッグ中
+  _resizeStartX: 0,
+  _resizeStartY: 0,
+  _resizeFontSize0: 0,
   pinching: false,
   pinchDist0: 0,
   pinchFontSize0: 0,
@@ -545,6 +549,34 @@ function render() {
   // 3. Polygon edge
   if (points.length >= 2) {
     vctx.save();
+    // 辺のホバーハイライト（マウス位置に辺があれば光らせる）
+    if (lastMousePos && points.length >= 2) {
+      const ei = hitTestEdge(lastMousePos.x, lastMousePos.y);
+      if (ei >= 0) {
+        const n  = points.length;
+        const a  = points[(ei - 1 + n) % n];
+        const b  = points[ei % n];
+        vctx.beginPath();
+        vctx.moveTo(sx(a), sy(a));
+        vctx.lineTo(sx(b), sy(b));
+        vctx.strokeStyle = 'rgba(71,200,255,0.9)';
+        vctx.lineWidth = 4;
+        vctx.setLineDash([]);
+        vctx.stroke();
+        // ＋マーク（中点）
+        const mx = (sx(a) + sx(b)) / 2;
+        const my = (sy(a) + sy(b)) / 2;
+        vctx.beginPath();
+        vctx.arc(mx, my, 8, 0, Math.PI * 2);
+        vctx.fillStyle = '#47c8ff';
+        vctx.fill();
+        vctx.font = 'bold 10px monospace';
+        vctx.fillStyle = '#000';
+        vctx.textAlign = 'center';
+        vctx.textBaseline = 'middle';
+        vctx.fillText('+', mx, my);
+      }
+    }
     vctx.beginPath();
     vctx.moveTo(sx(points[0]), sy(points[0]));
     for (let i = 1; i < points.length; i++) vctx.lineTo(sx(points[i]), sy(points[i]));
@@ -701,7 +733,7 @@ function drawFabricLabel(ctx) {
   ctx.fillText(line2, bx + barW + pad * 0.9, lineY + fs * 0.1);
 
   // ドラッグ中はハイライト枠
-  if (label.dragging) {
+  if (label.dragging || label.resizing) {
     ctx.strokeStyle = 'rgba(232,255,71,0.8)';
     ctx.lineWidth   = Math.max(1.5, fs * 0.06);
     ctx.setLineDash([fs * 0.2, fs * 0.1]);
@@ -713,6 +745,28 @@ function drawFabricLabel(ctx) {
 
   // ラベルの当たり判定用にサイズをキャッシュ
   label._bx = bx; label._by = by; label._bw = boxW; label._bh = boxH;
+
+  // 右下リサイズハンドル（常に表示）
+  if (label.visible) {
+    const hx = bx + boxW;
+    const hy = by + boxH;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(hx, hy, CORNER_R, 0, Math.PI * 2);
+    ctx.fillStyle   = label.resizing ? '#e8ff47' : 'rgba(255,255,255,0.9)';
+    ctx.fill();
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth   = 1.5;
+    ctx.setLineDash([]);
+    ctx.stroke();
+    // ↔ アイコン
+    ctx.fillStyle   = '#333';
+    ctx.font        = 'bold 9px monospace';
+    ctx.textAlign   = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('⤡', hx, hy);
+    ctx.restore();
+  }
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -735,9 +789,41 @@ function hitTestLabel(sx, sy) {
          sy >= label._by && sy <= label._by + label._bh;
 }
 
-/* ============================================================
-   POINTER INPUT
-============================================================ */
+// 角ハンドルのhitTest（0=右下, -1=なし）
+const CORNER_R = 12;
+function hitTestLabelCorner(sx, sy) {
+  if (!label.visible || !label._bw) return -1;
+  // 右下コーナーのみリサイズハンドル
+  const cx = label._bx + label._bw;
+  const cy = label._by + label._bh;
+  if (Math.hypot(sx - cx, sy - cy) < CORNER_R) return 0;
+  return -1;
+}
+
+// 辺への距離でヒットテスト → 挿入位置のインデックスを返す（-1=なし）
+function hitTestEdge(sx, sy) {
+  if (points.length < 2) return -1;
+  const EDGE_HIT = 14; // px
+  const n = points.length;
+  for (let i = 0; i < n; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % n];
+    const ax = a.x * scale + offX, ay = a.y * scale + offY;
+    const bx = b.x * scale + offX, by = b.y * scale + offY;
+    const dx = bx - ax, dy = by - ay;
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) continue;
+    const t = Math.max(0, Math.min(1, ((sx - ax) * dx + (sy - ay) * dy) / len2));
+    const px = ax + t * dx, py = ay + t * dy;
+    if (Math.hypot(sx - px, sy - py) < EDGE_HIT) {
+      // 両端の頂点に近すぎる場合は除外
+      if (Math.hypot(sx - ax, sy - ay) < 20) return -1;
+      if (Math.hypot(sx - bx, sy - by) < 20) return -1;
+      return (i + 1) % n === 0 ? n : i + 1; // 挿入位置
+    }
+  }
+  return -1;
+}
 const activePointers = new Map();
 let dragIdx         = -1;
 let didDrag         = false;
@@ -745,11 +831,33 @@ let panStart        = null;
 let pinchState      = null;
 let longTimer       = null;
 let pinchJustEnded  = false; // ピンチ直後の誤タップ防止フラグ
+let lastMousePos    = null;  // マウス位置（辺ハイライト用）
 
 wrap.addEventListener('pointerdown',   onPD, { passive: false });
 wrap.addEventListener('pointermove',   onPM, { passive: false });
 wrap.addEventListener('pointerup',     onPU, { passive: false });
 wrap.addEventListener('pointercancel', onPU, { passive: false });
+
+// PCマウス移動でエッジハイライト＋カーソル変更
+wrap.addEventListener('mousemove', e => {
+  if (activePointers.size > 0) return; // タッチ中は無視
+  const pos = getWrapPos(e);
+  lastMousePos = pos;
+  if (!srcImg) return;
+  // カーソル変更
+  if (label.visible && hitTestLabel(pos.x, pos.y)) {
+    const corner = hitTestLabelCorner(pos.x, pos.y);
+    vc.style.cursor = corner >= 0 ? 'nwse-resize' : (label._bw ? 'move' : 'default');
+  } else if (hitTestScreen(pos.x, pos.y) >= 0) {
+    vc.style.cursor = 'grab';
+  } else if (points.length >= 2 && hitTestEdge(pos.x, pos.y) >= 0) {
+    vc.style.cursor = 'cell';
+  } else {
+    vc.style.cursor = 'crosshair';
+  }
+  render();
+});
+wrap.addEventListener('mouseleave', () => { lastMousePos = null; render(); });
 
 function onPD(e) {
   e.preventDefault();
@@ -785,6 +893,16 @@ function onPD(e) {
   // ピンチ直後は無視
   if (pinchJustEnded) return;
   if (!srcImg || pinchState) return;
+
+  // ラベルのコーナーリサイズ判定（ドラッグより先に）
+  if (label.visible && hitTestLabelCorner(pos.x, pos.y) >= 0) {
+    label.resizing       = true;
+    label._resizeStartX  = pos.x;
+    label._resizeStartY  = pos.y;
+    label._resizeFontSize0 = label.fontSize;
+    didDrag = false;
+    return;
+  }
 
   // ラベルのドラッグ判定（頂点より優先）
   if (label.visible && hitTestLabel(pos.x, pos.y)) {
@@ -852,6 +970,18 @@ function onPM(e) {
     return;
   }
 
+  // ラベルコーナーリサイズ
+  if (label.resizing) {
+    didDrag = true;
+    const dx = pos.x - label._resizeStartX;
+    const dy = pos.y - label._resizeStartY;
+    const delta = (dx + dy) / 2;
+    const newFs = label._resizeFontSize0 + delta / scale;
+    label.fontSize = Math.min(120, Math.max(8, newFs));
+    render();
+    return;
+  }
+
   // ラベルドラッグ
   if (label.dragging) {
     didDrag = true;
@@ -895,11 +1025,19 @@ function onPU(e) {
   if (pinchState && activePointers.size < 2) {
     pinchState         = null;
     label.pinching     = false;
+    label.resizing     = false;
     pinchJustEnded     = true;
     setTimeout(() => { pinchJustEnded = false; }, 300);
     dragIdx        = -1;
     panStart       = null;
     label.dragging = false;
+    return;
+  }
+
+  // ラベルリサイズ終了
+  if (label.resizing) {
+    label.resizing = false;
+    render();
     return;
   }
 
@@ -910,11 +1048,20 @@ function onPU(e) {
     return;
   }
 
-  // 空白タップ（移動量6px未満）→ 頂点追加
+  // 空白タップ（移動量6px未満）→ 辺への挿入 or 新規頂点追加
   if (panStart && !didDrag && srcImg && dragIdx < 0) {
     const ip = screenToImg(panStart.cx, panStart.cy);
     if (ip.x >= 0 && ip.x <= srcImg.width && ip.y >= 0 && ip.y <= srcImg.height) {
-      points.push({ x: ip.x, y: ip.y });
+      // 辺ヒットテスト（3点以上あれば）
+      const edgeIdx = points.length >= 2 ? hitTestEdge(panStart.cx, panStart.cy) : -1;
+      if (edgeIdx >= 0) {
+        // 辺に挿入
+        points.splice(edgeIdx, 0, { x: ip.x, y: ip.y });
+        showStatus('辺に頂点を挿入しました', 'info');
+      } else {
+        // 新規追加
+        points.push({ x: ip.x, y: ip.y });
+      }
       applied = false;
       updatePointCount();
       updateApplyBtn();
@@ -930,11 +1077,20 @@ function cancelLong() {
   if (longTimer) { clearTimeout(longTimer); longTimer = null; }
 }
 
-// Mouse wheel zoom
+// Mouse wheel: ラベル上ならサイズ変更、それ以外はズーム
 wrap.addEventListener('wheel', e => {
   e.preventDefault();
   if (!srcImg) return;
-  const pos   = getWrapPos(e);
+  const pos = getWrapPos(e);
+
+  if (label.visible && hitTestLabel(pos.x, pos.y)) {
+    // ラベルサイズ変更
+    const delta = e.deltaY > 0 ? 0.9 : 1.11;
+    label.fontSize = Math.min(120, Math.max(10, label.fontSize * delta));
+    render();
+    return;
+  }
+
   const delta = e.deltaY > 0 ? 0.85 : 1.18;
   const imgX  = (pos.x - offX) / scale;
   const imgY  = (pos.y - offY) / scale;
