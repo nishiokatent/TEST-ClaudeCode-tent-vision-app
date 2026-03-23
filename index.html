@@ -342,13 +342,6 @@
     ontouchstart="startBefore(event)" ontouchend="endBefore(event)">
     👁 BEFORE
   </button>
-  <!-- Before/After ボタン -->
-  <button id="before-btn"
-    style="display:none;position:absolute;bottom:12px;left:12px;background:rgba(15,15,15,0.85);border:1px solid rgba(255,255,255,0.2);color:#f0f0f0;padding:6px 14px;border-radius:20px;font-size:0.72rem;font-weight:700;font-family:inherit;cursor:pointer;backdrop-filter:blur(8px);z-index:10;"
-    onpointerdown="startBefore(event)" onpointerup="endBefore(event)" onpointerleave="endBefore(event)"
-    ontouchstart="startBefore(event)" ontouchend="endBefore(event)">
-    👁 BEFORE
-  </button>
 </div>
 
 <div id="bottom-panel">
@@ -444,6 +437,7 @@ document.getElementById('pw-field').addEventListener('keydown', e => {
 ============================================================ */
 function startBefore(e) {
   e.preventDefault();
+  e.stopPropagation();
   if (!applied) return;
   showBefore = true;
   const ov = document.getElementById('ba-overlay');
@@ -453,6 +447,7 @@ function startBefore(e) {
 }
 function endBefore(e) {
   e.preventDefault();
+  e.stopPropagation();
   if (!showBefore) return;
   showBefore = false;
   const ov = document.getElementById('ba-overlay');
@@ -978,8 +973,8 @@ function drawFabricLabel(ctx) {
   // ラベルの当たり判定用にサイズをキャッシュ
   label._bx = bx; label._by = by; label._bw = boxW; label._bh = boxH;
 
-  // 右下リサイズハンドル（常に表示）
-  if (label.visible) {
+  // 右下リサイズハンドル（PCのみ表示）
+  if (label.visible && !('ontouchstart' in window)) {
     const hx = bx + boxW;
     const hy = by + boxH;
     ctx.save();
@@ -991,7 +986,6 @@ function drawFabricLabel(ctx) {
     ctx.lineWidth   = 1.5;
     ctx.setLineDash([]);
     ctx.stroke();
-    // ↔ アイコン
     ctx.fillStyle   = '#333';
     ctx.font        = 'bold 9px monospace';
     ctx.textAlign   = 'center';
@@ -1438,12 +1432,43 @@ function renderOffscreen() {
 ============================================================ */
 function downloadImage() {
   if (!srcImg || !applied) { showStatus('先に生地を適用してください', 'error'); return; }
+
+  // iOSはWeb Share API経由でカメラロールに保存
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  if (isIOS) {
+    shareToSave();
+    return;
+  }
+
+  // PC・Android：通常ダウンロード
   const out  = renderOffscreen();
   const link = document.createElement('a');
   link.download = `tent_sim_${new Date().toISOString().slice(0,10)}.png`;
   link.href     = out.toDataURL('image/png');
   link.click();
   showStatus('保存しました 💾', 'success');
+}
+
+// iOS用：シェアシート経由でカメラロールへ
+async function shareToSave() {
+  const out = renderOffscreen();
+  out.toBlob(async (blob) => {
+    const fname = `tent_sim_${new Date().toISOString().slice(0,10)}.png`;
+    const file  = new File([blob], fname, { type: 'image/png' });
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: '西岡テント 張替シミュレーション' });
+        showStatus('保存・シェアしました 📸', 'success');
+      } catch(e) {
+        if (e.name !== 'AbortError') showStatus('キャンセルしました', 'info');
+      }
+    } else {
+      // フォールバック
+      const link = document.createElement('a');
+      link.download = fname; link.href = URL.createObjectURL(blob); link.click();
+      showStatus('保存しました 💾', 'success');
+    }
+  }, 'image/png');
 }
 
 /* ============================================================
