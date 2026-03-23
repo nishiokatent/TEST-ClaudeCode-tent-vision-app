@@ -708,6 +708,22 @@ function boostedColor(r, g, b, blendVal) {
 }
 
 /* ============================================================
+   CONTRAST HELPER — iOS Safariはfilter+clipが効かないため
+   オフスクリーンcanvasで先にコントラスト処理する
+============================================================ */
+function makeContrastedImage(src, ct, sw, sh, dx, dy, dw, dh) {
+  // ct=1.0なら処理不要
+  if (Math.abs(ct - 1.0) < 0.01) return null;
+  const tmp = document.createElement('canvas');
+  tmp.width  = dw; tmp.height = dh;
+  const tc = tmp.getContext('2d');
+  tc.filter = `contrast(${ct})`;
+  tc.drawImage(src, dx, dy, dw, dh, 0, 0, dw, dh);
+  tc.filter = 'none';
+  return tmp;
+}
+
+/* ============================================================
    RENDER
 ============================================================ */
 function render() {
@@ -732,6 +748,11 @@ function render() {
   // 2. Fabric fill（ハイブリッド合成 + 彩度連動 + コントラスト）
   if (applied && currentFabric && points.length >= 3) {
     const [r, g, b] = boostedColor(currentFabric.r, currentFabric.g, currentFabric.b, blend);
+    const ct = 1 + contrast / 100;
+
+    // コントラスト処理済みの画像を用意（iOS対応：filter+clipを避ける）
+    const contrastedImg = makeContrastedImage(srcImg, ct,
+      srcImg.width, srcImg.height, 0, 0, iw, ih);
 
     vctx.save();
     vctx.beginPath();
@@ -740,13 +761,12 @@ function render() {
     vctx.closePath();
     vctx.clip();
 
-    // コントラストフィルター（影の強弱）
-    const ct = 1 + contrast / 100; // -50→0.5, 0→1.0, 100→2.0
-    vctx.filter = `contrast(${ct})`;
-
-    // 元画像をクリップ内に再描画（コントラスト適用）
-    vctx.drawImage(srcImg, offX, offY, iw, ih);
-    vctx.filter = 'none';
+    // クリップ内に画像再描画（コントラスト適用済み or 元画像）
+    if (contrastedImg) {
+      vctx.drawImage(contrastedImg, offX, offY, iw, ih);
+    } else {
+      vctx.drawImage(srcImg, offX, offY, iw, ih);
+    }
 
     // 生地色を重ねる
     if (blend <= 0) {
@@ -850,7 +870,7 @@ function render() {
 
   // 5. 生地ラベル
   if (label.visible && currentFabric && applied) {
-    drawFabricLabel(vctx);
+    drawFabricLabel(vctx, true); // 画面表示時はハンドルあり
   }
 }
 
@@ -888,7 +908,7 @@ function getLabelMetrics() {
   return { sx, sy, fs };
 }
 
-function drawFabricLabel(ctx) {
+function drawFabricLabel(ctx, showHandle = true) {
   const f  = currentFabric;
   const line1 = `${f.maker} ${f.name}`;
   const line2 = `${f.code}  ${f.color}`;
@@ -973,8 +993,8 @@ function drawFabricLabel(ctx) {
   // ラベルの当たり判定用にサイズをキャッシュ
   label._bx = bx; label._by = by; label._bw = boxW; label._bh = boxH;
 
-  // 右下リサイズハンドル（PCのみ表示）
-  if (label.visible && !('ontouchstart' in window)) {
+  // 右下リサイズハンドル（PCのみ・showHandleがtrueの時のみ）
+  if (label.visible && showHandle && !('ontouchstart' in window)) {
     const hx = bx + boxW;
     const hy = by + boxH;
     ctx.save();
@@ -1395,15 +1415,22 @@ function renderOffscreen() {
   if (currentFabric && points.length >= 3) {
     const [r, g, b] = boostedColor(currentFabric.r, currentFabric.g, currentFabric.b, blend);
     const ct = 1 + contrast / 100;
+
+    // オフスクリーンでコントラスト処理
+    const contrastedImg = makeContrastedImage(srcImg, ct,
+      srcImg.width, srcImg.height, 0, 0, srcImg.width, srcImg.height);
+
     oc.save();
     oc.beginPath();
     oc.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i++) oc.lineTo(points[i].x, points[i].y);
     oc.closePath();
     oc.clip();
-    oc.filter = `contrast(${ct})`;
-    oc.drawImage(srcImg, 0, 0);
-    oc.filter = 'none';
+    if (contrastedImg) {
+      oc.drawImage(contrastedImg, 0, 0);
+    } else {
+      oc.drawImage(srcImg, 0, 0);
+    }
     if (blend <= 0) {
       oc.globalCompositeOperation = 'multiply'; oc.globalAlpha = opacity;
       oc.fillStyle = `rgb(${r},${g},${b})`; oc.fillRect(0, 0, srcImg.width, srcImg.height);
@@ -1421,7 +1448,7 @@ function renderOffscreen() {
   if (label.visible && currentFabric) {
     const _s = scale, _x = offX, _y = offY;
     scale = 1; offX = 0; offY = 0;
-    drawFabricLabel(oc);
+    drawFabricLabel(oc, false); // ← 保存時はハンドル非表示
     scale = _s; offX = _x; offY = _y;
   }
   return out;
