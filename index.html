@@ -1,538 +1,834 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>テント自動張替シミュレーター - OpenAI Vision版</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { 
-            font-family: 'Helvetica Neue', Arial, sans-serif; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 20px; 
-            min-height: 100vh;
-        }
-        .container { 
-            max-width: 900px; 
-            margin: auto; 
-            background: white; 
-            padding: 30px; 
-            border-radius: 20px; 
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3); 
-        }
-        h1 { 
-            font-size: 1.8rem; 
-            color: #333; 
-            text-align: center; 
-            margin-bottom: 10px; 
-            font-weight: 700;
-        }
-        .subtitle {
-            text-align: center;
-            color: #666;
-            font-size: 0.9rem;
-            margin-bottom: 30px;
-        }
-        label { 
-            font-size: 0.85rem; 
-            color: #444; 
-            font-weight: 600; 
-            display: block;
-            margin-top: 15px;
-        }
-        input, select, button { 
-            width: 100%; 
-            padding: 12px; 
-            margin: 8px 0 15px 0; 
-            border: 2px solid #e0e0e0; 
-            border-radius: 10px; 
-            font-size: 1rem; 
-            box-sizing: border-box;
-            transition: border 0.3s;
-        }
-        input:focus, select:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        button { 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white; 
-            border: none; 
-            cursor: pointer; 
-            font-weight: 600;
-            font-size: 1.1rem;
-            padding: 15px;
-            margin-top: 20px;
-            transition: all 0.3s;
-        }
-        button:hover { 
-            opacity: 0.9;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-        .canvas-wrapper {
-            margin: 30px 0;
-            text-align: center;
-            background: #f5f5f5;
-            padding: 20px;
-            border-radius: 15px;
-        }
-        canvas { 
-            max-width: 100%; 
-            border: 3px solid #ddd; 
-            border-radius: 12px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-        #status { 
-            padding: 15px; 
-            border-radius: 10px; 
-            margin: 20px 0; 
-            font-size: 0.95rem;
-            display: none;
-        }
-        #status.show {
-            display: block;
-        }
-        #status.info {
-            background: #fff3cd;
-            border-left: 4px solid #ffc107;
-            color: #856404;
-        }
-        #status.success {
-            background: #d4edda;
-            border-left: 4px solid #28a745;
-            color: #155724;
-        }
-        #status.error {
-            background: #f8d7da;
-            border-left: 4px solid #dc3545;
-            color: #721c24;
-        }
-        .info-box {
-            background: #e7f3ff;
-            padding: 20px;
-            border-radius: 12px;
-            margin: 20px 0;
-            border-left: 4px solid #2196F3;
-        }
-        .info-box h3 {
-            margin-top: 0;
-            color: #1976D2;
-            font-size: 1.1rem;
-        }
-        .info-box ol {
-            margin: 10px 0;
-            padding-left: 20px;
-        }
-        .info-box li {
-            margin: 8px 0;
-            line-height: 1.6;
-        }
-        .btn-group {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
-        .btn-group button {
-            flex: 1;
-        }
-        .btn-secondary {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        }
-        .btn-success {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-        }
-        .debug-info {
-            margin-top: 15px;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            font-size: 0.8rem;
-            color: #666;
-            display: none;
-        }
-        .debug-info.show {
-            display: block;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>テント張替シミュレーター</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --surface2: #242424;
+    --border: #2e2e2e;
+    --accent: #e8ff47;
+    --accent2: #47c8ff;
+    --text: #f0f0f0;
+    --text2: #888;
+    --danger: #ff4747;
+    --success: #47ff8a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body, #canvas-wrap, #bottom-panel {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    height: 100dvh;
+    width: 100dvw;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    gap: 8px;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-text {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+  }
+  /* Hanko stamp mark */
+  .hanko {
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+  }
+  .header-right { display: flex; align-items: center; gap: 8px; }
+
+  #canvas-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #0a0a0a;
+    touch-action: none;
+  }
+
+  #view-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  #empty-state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    pointer-events: none;
+  }
+  .empty-icon {
+    width: 64px; height: 64px;
+    border: 2px dashed var(--border);
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.8rem;
+  }
+  .empty-text { color: var(--text2); font-size: 0.85rem; text-align: center; line-height: 1.8; }
+
+  #status-bar {
+    position: absolute;
+    top: 12px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15,15,15,0.92);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: 20;
+  }
+  #status-bar.show    { opacity: 1; }
+  #status-bar.success { border-color: var(--success); color: var(--success); }
+  #status-bar.error   { border-color: var(--danger);  color: var(--danger); }
+  #status-bar.info    { border-color: var(--accent2); color: var(--accent2); }
+
+  #zoom-indicator {
+    position: absolute;
+    bottom: 12px; right: 12px;
+    background: rgba(15,15,15,0.85);
+    border: 1px solid var(--border);
+    color: var(--text2);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    pointer-events: none;
+  }
+
+  #bottom-panel {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .tab-bar { display: flex; border-bottom: 1px solid var(--border); }
+  .tab {
+    flex: 1; padding: 10px;
+    text-align: center; font-size: 0.72rem; font-weight: 600;
+    color: var(--text2); cursor: pointer; letter-spacing: 0.04em;
+    border-bottom: 2px solid transparent; transition: all 0.2s;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-content { display: none; padding: 12px 16px; }
+  .tab-content.active { display: block; }
+
+  .ctrl-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .ctrl-row:last-child { margin-bottom: 0; }
+  label.ctrl-label {
+    font-size: 0.72rem; color: var(--text2); font-weight: 600;
+    letter-spacing: 0.06em; white-space: nowrap; min-width: 48px;
+  }
+  select, input[type="password"] {
+    flex: 1;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 8px 10px; border-radius: 8px;
+    font-size: 0.8rem; font-family: inherit; outline: none;
+    transition: border 0.2s; min-width: 0;
+  }
+  select:focus, input[type="password"]:focus { border-color: var(--accent2); }
+
+  .btn {
+    display: flex; align-items: center; justify-content: center;
+    gap: 6px; padding: 9px 14px; border-radius: 8px;
+    font-size: 0.78rem; font-weight: 700; font-family: inherit;
+    cursor: pointer; border: none; transition: all 0.15s;
+    letter-spacing: 0.03em; white-space: nowrap;
+  }
+  .btn:active { transform: scale(0.96); }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+  .btn-primary { background: var(--accent); color: #0f0f0f; }
+  .btn-ghost   { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-danger  { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+  .btn-success { background: var(--success); color: #0f0f0f; }
+  .btn-icon    { width: 36px; height: 36px; padding: 0; border-radius: 8px; font-size: 1rem; }
+  .btn-row     { display: flex; gap: 8px; }
+  .btn-row .btn{ flex: 1; }
+
+  .mode-toggle {
+    display: flex; background: var(--surface2); border-radius: 8px;
+    padding: 3px; gap: 2px; border: 1px solid var(--border);
+  }
+  .mode-btn {
+    flex: 1; padding: 6px 10px; border-radius: 6px;
+    font-size: 0.72rem; font-weight: 700; font-family: inherit;
+    cursor: pointer; border: none; background: transparent;
+    color: var(--text2); transition: all 0.15s; letter-spacing: 0.04em;
+  }
+  .mode-btn.active { background: var(--accent); color: #0f0f0f; }
+
+  .hint {
+    font-size: 0.68rem; color: var(--text2); line-height: 1.7;
+    padding: 8px 10px; background: var(--surface2); border-radius: 8px;
+    border-left: 2px solid var(--accent2); margin-bottom: 8px;
+  }
+  .point-badge {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text2); border-radius: 6px; padding: 4px 8px;
+    font-family: 'DM Mono', monospace; font-size: 0.72rem;
+  }
+  .point-badge span { color: var(--accent); font-weight: 700; }
+  .color-swatch {
+    width: 20px; height: 20px; border-radius: 4px;
+    border: 1px solid var(--border); flex-shrink: 0;
+  }
+  #upload-btn { position: relative; overflow: hidden; }
+  #upload-input { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 100px; }
+  input[type="range"] { flex: 1; accent-color: var(--accent); cursor: pointer; }
+  .range-val {
+    font-family: 'DM Mono', monospace; font-size: 0.72rem;
+    color: var(--accent); min-width: 30px; text-align: right;
+  }
+</style>
 </head>
 <body>
 
-<div class="container">
-    <h1>🎪 テント自動張替シミュレーター</h1>
-    <div class="subtitle">OpenAI GPT-4o Vision AI - 完全自動認識版</div>
-
-    <div class="info-box">
-        <h3>📋 使い方</h3>
-        <ol>
-            <li><strong>パスワード</strong>を入力（社内用）</li>
-            <li><strong>生地を選択</strong>してください</li>
-            <li><strong>店舗写真をアップロード</strong></li>
-            <li><strong>「AI自動検出＆張替」</strong>をクリック</li>
-            <li>AIがテント部分を自動認識し、選択した生地で張替イメージを生成します</li>
-        </ol>
-    </div>
-
-    <label>🔐 パスワード</label>
-    <input type="password" id="password" placeholder="社内パスワードを入力">
-
-    <label>🎨 生地を選択</label>
-    <select id="fabricSelect">
-        <option>生地データ読み込み中...</option>
-    </select>
-
-    <label>📸 店舗写真をアップロード</label>
-    <input type="file" id="upload" accept="image/*">
-
-    <button id="detectBtn" onclick="detectAndReplace()" disabled>
-        🤖 AI自動検出＆張替
+<header>
+  <div class="logo">
+  <!-- 落款風ハンコマーク -->
+  <svg class="hanko" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+    <!-- 外枠二重円 -->
+    <circle cx="40" cy="40" r="37" fill="none" stroke="#c0392b" stroke-width="2.5"/>
+    <circle cx="40" cy="40" r="33" fill="none" stroke="#c0392b" stroke-width="1"/>
+    <!-- 背景うっすら赤 -->
+    <circle cx="40" cy="40" r="33" fill="rgba(192,57,43,0.08)"/>
+    <!-- 上段：西岡 -->
+    <text x="40" y="30" text-anchor="middle" dominant-baseline="middle"
+      font-family="'Noto Serif JP','Noto Sans JP',serif" font-size="17" font-weight="700"
+      fill="#c0392b" letter-spacing="3">西岡</text>
+    <!-- 区切り線 -->
+    <line x1="18" y1="40" x2="62" y2="40" stroke="#c0392b" stroke-width="0.8" opacity="0.6"/>
+    <!-- 下段：テント -->
+    <text x="40" y="54" text-anchor="middle" dominant-baseline="middle"
+      font-family="'Noto Serif JP','Noto Sans JP',serif" font-size="13" font-weight="700"
+      fill="#c0392b" letter-spacing="2">テント</text>
+  </svg>
+  <span class="logo-text">TENT SIM</span>
+</div>
+  <div class="header-right">
+    <div class="point-badge">頂点 <span id="point-count">0</span></div>
+    <button class="btn btn-ghost btn-icon" id="upload-btn">
+      📂<input type="file" id="upload-input" accept="image/*">
     </button>
+  </div>
+</header>
 
-    <div id="status"></div>
+<div id="canvas-wrap">
+  <canvas id="view-canvas"></canvas>
+  <div id="empty-state">
+    <svg viewBox="0 0 120 120" width="100" height="100" xmlns="http://www.w3.org/2000/svg" style="opacity:0.55">
+      <circle cx="60" cy="60" r="56" fill="none" stroke="#c0392b" stroke-width="3.5"/>
+      <circle cx="60" cy="60" r="50" fill="none" stroke="#c0392b" stroke-width="1.2"/>
+      <circle cx="60" cy="60" r="50" fill="rgba(192,57,43,0.07)"/>
+      <text x="60" y="44" text-anchor="middle" dominant-baseline="middle"
+        font-family="'Noto Serif JP','Noto Sans JP',serif" font-size="26" font-weight="700"
+        fill="#c0392b" letter-spacing="4">西岡</text>
+      <line x1="22" y1="60" x2="98" y2="60" stroke="#c0392b" stroke-width="1" opacity="0.5"/>
+      <text x="60" y="80" text-anchor="middle" dominant-baseline="middle"
+        font-family="'Noto Serif JP','Noto Sans JP',serif" font-size="20" font-weight="700"
+        fill="#c0392b" letter-spacing="3">テント</text>
+    </svg>
+    <div class="empty-text">右上の 📂 から<br>店舗写真を開いてください</div>
+  </div>
+  <div id="status-bar"></div>
+  <div id="zoom-indicator">100%</div>
+</div>
 
-    <div class="canvas-wrapper" id="canvasWrapper" style="display:none;">
-        <canvas id="canvas"></canvas>
+<div id="bottom-panel">
+  <div class="tab-bar">
+    <div class="tab active" data-tab="draw">✏️ 選択</div>
+    <div class="tab" data-tab="fabric">🎨 生地</div>
+    <div class="tab" data-tab="export">💾 出力</div>
+  </div>
+
+  <div class="tab-content active" id="tab-draw">
+    <div class="hint">
+      📌 タップで頂点追加　　✋ 頂点をドラッグで移動<br>
+      🔍 2本指ピンチでズーム／移動　　🗑 頂点を長押しで削除
     </div>
-
-    <div id="debugInfo" class="debug-info"></div>
-
-    <div class="btn-group" id="actionButtons" style="display:none;">
-        <button onclick="downloadImage()" class="btn-success">💾 画像をダウンロード</button>
-        <button onclick="reset()" class="btn-secondary">🔄 リセット</button>
+    <div class="btn-row">
+      <button class="btn btn-ghost"  onclick="undoPoint()">↩ 戻す</button>
+      <button class="btn btn-danger" onclick="clearPoints()">🗑 全消去</button>
     </div>
+  </div>
+
+  <div class="tab-content" id="tab-fabric">
+    <div class="ctrl-row">
+      <label class="ctrl-label">生地</label>
+      <div class="color-swatch" id="fabric-swatch"></div>
+      <select id="fabric-select" onchange="onFabricChange()">
+        <option value="">読み込み中...</option>
+      </select>
+    </div>
+    <div class="ctrl-row">
+      <label class="ctrl-label">強度</label>
+      <input type="range" id="opacity-slider" min="10" max="100" value="75" oninput="onOpacityChange()">
+      <div class="range-val" id="opacity-val">75%</div>
+    </div>
+    <button class="btn btn-primary" style="width:100%;margin-top:4px" id="apply-btn" onclick="applyFabric()" disabled>
+      🎨 生地を適用
+    </button>
+  </div>
+
+  <div class="tab-content" id="tab-export">
+    <div class="ctrl-row">
+      <label class="ctrl-label">PW</label>
+      <input type="password" id="password" placeholder="社内パスワード（任意）">
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-success" id="download-btn" onclick="downloadImage()" disabled>💾 保存</button>
+      <button class="btn btn-ghost"   onclick="resetAll()">🔄 リセット</button>
+    </div>
+  </div>
 </div>
 
 <script>
-
-/* =========================
-   設定
-========================= */
+/* ============================================================
+   CONFIG
+============================================================ */
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQyMy5PUSJjr1f_fnQIpRIUagAp8Dw7Hqckr9422w_459qgQ_j4Bhw4LWygLVWTURa9n4Xl_gBNHAie/pub?output=csv";
+const APP_PW  = 'tent';
 
-// ★ 修正: 正しいAPIエンドポイントパスを指定
-const API_URL = "https://test-claude-code-tent-vision-app.vercel.app/api/detectTent";
+/* ============================================================
+   ELEMENTS
+============================================================ */
+const wrap  = document.getElementById('canvas-wrap');
+const vc    = document.getElementById('view-canvas');
+const vctx  = vc.getContext('2d');
+const empty = document.getElementById('empty-state');
 
-/* =========================
-   グローバル変数
-========================= */
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
+/* ============================================================
+   STATE
+============================================================ */
+let srcImg        = null;
+let points        = [];
+let applied       = false;
+let scale         = 1;
+let offX          = 0;
+let offY          = 0;
+let fabricDB      = [];
+let currentFabric = null;
+let opacity       = 0.75;
 
-let originalImage = null;
-let fabricDatabase = [];
-let detectedPolygon = null; // 正規化座標 (0.0〜1.0)
+/* ============================================================
+   CANVAS RESIZE — physical pixels = CSS pixels × DPR
+============================================================ */
+let cssW = 0, cssH = 0;
 
-/* =========================
-   ステータス表示
-========================= */
-function showStatus(message, type = 'info') {
-    const status = document.getElementById('status');
-    status.textContent = message;
-    status.className = `show ${type}`;
+function resizeCanvas() {
+  cssW = wrap.clientWidth;
+  cssH = wrap.clientHeight;
+  const dpr = window.devicePixelRatio || 1;
+  vc.width  = cssW * dpr;
+  vc.height = cssH * dpr;
+  vc.style.width  = cssW + 'px';
+  vc.style.height = cssH + 'px';
+  // Reset transform each resize then re-apply DPR scale
+  vctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  render();
 }
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
 
-function hideStatus() {
-    const status = document.getElementById('status');
-    status.className = '';
-}
+/* ============================================================
+   TABS
+============================================================ */
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('tab-' + t.dataset.tab).classList.add('active');
+  });
+});
 
-function showDebug(text) {
-    const el = document.getElementById('debugInfo');
-    el.textContent = text;
-    el.className = 'debug-info show';
-}
-
-/* =========================
-   CSV読み込み（生地マスター）
-========================= */
+/* ============================================================
+   CSV
+============================================================ */
 fetch(CSV_URL)
-    .then(res => res.text())
-    .then(text => {
-        const rows = text.trim().split("\n").slice(1);
-        const select = document.getElementById("fabricSelect");
-        select.innerHTML = "";
-
-        rows.forEach((row, index) => {
-            if (!row.trim()) return;
-
-            // ★ 修正: カンマ区切りCSVのパースを改善（引用符対応）
-            const cols = parseCSVRow(row);
-
-            const fabric = {
-                maker: (cols[0] || '').trim(),
-                name: (cols[1] || '').trim(),
-                code: (cols[2] || '').trim(),
-                color: (cols[3] || '').trim(),
-                r: (cols[4] || '').trim(),
-                g: (cols[5] || '').trim(),
-                b: (cols[6] || '').trim()
-            };
-
-            fabricDatabase.push(fabric);
-
-            const hasRGB = fabric.r && fabric.g && fabric.b &&
-                           !isNaN(parseInt(fabric.r)) && !isNaN(parseInt(fabric.g)) && !isNaN(parseInt(fabric.b));
-            if (!hasRGB) return;
-
-            const option = document.createElement("option");
-            option.textContent = `${fabric.maker} ${fabric.name} ${fabric.code} - ${fabric.color}`;
-            option.value = index;
-            select.appendChild(option);
-        });
-
-        if (select.options.length === 0) {
-            const option = document.createElement("option");
-            option.textContent = "有効な生地データがありません";
-            select.appendChild(option);
-        } else {
-            showStatus('✅ 生地データを読み込みました', 'success');
-            setTimeout(hideStatus, 3000);
-        }
-    })
-    .catch(err => {
-        console.error('CSV Load Error:', err);
-        showStatus('❌ 生地データの読み込みに失敗しました: ' + err.message, 'error');
+  .then(r => r.text())
+  .then(text => {
+    const rows = text.trim().split('\n').slice(1);
+    const sel  = document.getElementById('fabric-select');
+    sel.innerHTML = '<option value="">生地を選択...</option>';
+    rows.forEach(row => {
+      if (!row.trim()) return;
+      const c = row.split(',');
+      if (!c[4] || !c[5] || !c[6]) return;
+      const f = { maker: c[0], name: c[1], code: c[2], color: c[3], r: +c[4], g: +c[5], b: +c[6] };
+      fabricDB.push(f);
+      const opt = document.createElement('option');
+      opt.value = fabricDB.length - 1;
+      opt.textContent = `${f.maker} ${f.name} ${f.code} - ${f.color}`;
+      sel.appendChild(opt);
     });
+    showStatus('生地データ読み込み完了', 'success');
+  })
+  .catch(() => showStatus('生地データの読み込みに失敗しました', 'error'));
 
-/* CSVの1行をパース（引用符対応） */
-function parseCSVRow(row) {
-    const result = [];
-    let current = '';
-    let inQuotes = false;
-    for (let i = 0; i < row.length; i++) {
-        const ch = row[i];
-        if (ch === '"') {
-            inQuotes = !inQuotes;
-        } else if (ch === ',' && !inQuotes) {
-            result.push(current);
-            current = '';
-        } else {
-            current += ch;
-        }
-    }
-    result.push(current);
-    return result;
+function onFabricChange() {
+  const v = document.getElementById('fabric-select').value;
+  currentFabric = v === '' ? null : fabricDB[+v];
+  document.getElementById('fabric-swatch').style.background = currentFabric
+    ? `rgb(${currentFabric.r},${currentFabric.g},${currentFabric.b})`
+    : 'var(--surface2)';
+  updateApplyBtn();
 }
 
-/* =========================
-   画像アップロード
-========================= */
-document.getElementById("upload").onchange = e => {
-    const file = e.target.files[0];
-    if (!file) return;
+function onOpacityChange() {
+  opacity = document.getElementById('opacity-slider').value / 100;
+  document.getElementById('opacity-val').textContent = Math.round(opacity * 100) + '%';
+  if (applied) render();
+}
 
-    const img = new Image();
-    img.onload = () => {
-        const maxWidth = 800;
-        const scale = img.width > maxWidth ? maxWidth / img.width : 1;
-        
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-
-        originalImage = img;
-        detectedPolygon = null;
-
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        
-        document.getElementById('canvasWrapper').style.display = 'block';
-        document.getElementById('detectBtn').disabled = false;
-        document.getElementById('actionButtons').style.display = 'none';
-        
-        showStatus(`📸 画像を読み込みました (${canvas.width}×${canvas.height}px)。AI検出を実行してください`, 'success');
+/* ============================================================
+   IMAGE UPLOAD
+============================================================ */
+document.getElementById('upload-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const image = new Image();
+    image.onload = () => {
+      srcImg  = image;
+      points  = [];
+      applied = false;
+      empty.style.display = 'none';
+      fitToScreen();
+      render();
+      updatePointCount();
+      updateApplyBtn();
+      document.getElementById('download-btn').disabled = true;
+      showStatus('画像を読み込みました', 'success');
     };
+    image.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+});
 
-    img.src = URL.createObjectURL(file);
-};
-
-/* =========================
-   画像をBase64に変換
-========================= */
-function imageToBase64(img) {
-    const tempCanvas = document.createElement('canvas');
-    const maxWidth = 800;
-    const scale = img.width > maxWidth ? maxWidth / img.width : 1;
-    
-    tempCanvas.width = img.width * scale;
-    tempCanvas.height = img.height * scale;
-    
-    const tempCtx = tempCanvas.getContext('2d');
-    tempCtx.drawImage(img, 0, 0, tempCanvas.width, tempCanvas.height);
-    return tempCanvas.toDataURL('image/jpeg', 0.9).split(',')[1];
+function fitToScreen() {
+  scale = Math.min(cssW / srcImg.width, cssH / srcImg.height) * 0.95;
+  offX  = (cssW - srcImg.width  * scale) / 2;
+  offY  = (cssH - srcImg.height * scale) / 2;
+  updateZoomLabel();
 }
 
-/* =========================
-   AI検出＆張替実行
-========================= */
-async function detectAndReplace() {
-    const password = document.getElementById('password').value;
-    const selectedIndex = document.getElementById('fabricSelect').value;
+/* ============================================================
+   RENDER
+============================================================ */
+function render() {
+  vctx.clearRect(0, 0, cssW, cssH);
+  if (!srcImg) return;
 
-    if (!password) {
-        showStatus('❌ パスワードを入力してください', 'error');
-        return;
+  const iw = srcImg.width  * scale;
+  const ih = srcImg.height * scale;
+
+  // 1. Image
+  vctx.drawImage(srcImg, offX, offY, iw, ih);
+
+  if (points.length === 0) return;
+
+  // Screen coords of a point
+  const sx = p => p.x * scale + offX;
+  const sy = p => p.y * scale + offY;
+
+  // 2. Fabric fill
+  if (applied && currentFabric && points.length >= 3) {
+    vctx.save();
+    vctx.beginPath();
+    vctx.moveTo(sx(points[0]), sy(points[0]));
+    for (let i = 1; i < points.length; i++) vctx.lineTo(sx(points[i]), sy(points[i]));
+    vctx.closePath();
+    vctx.clip();
+    vctx.globalCompositeOperation = 'multiply';
+    vctx.globalAlpha = opacity;
+    vctx.fillStyle = `rgb(${currentFabric.r},${currentFabric.g},${currentFabric.b})`;
+    vctx.fillRect(offX, offY, iw, ih);
+    vctx.restore();
+  }
+
+  // 3. Polygon edge
+  if (points.length >= 2) {
+    vctx.save();
+    vctx.beginPath();
+    vctx.moveTo(sx(points[0]), sy(points[0]));
+    for (let i = 1; i < points.length; i++) vctx.lineTo(sx(points[i]), sy(points[i]));
+    if (points.length >= 3) vctx.closePath();
+    vctx.strokeStyle = 'rgba(232,255,71,0.9)';
+    vctx.lineWidth = 2;
+    vctx.setLineDash([]);
+    vctx.stroke();
+    if (points.length >= 3) {
+      vctx.beginPath();
+      vctx.moveTo(sx(points[points.length-1]), sy(points[points.length-1]));
+      vctx.lineTo(sx(points[0]), sy(points[0]));
+      vctx.setLineDash([6, 4]);
+      vctx.strokeStyle = 'rgba(232,255,71,0.35)';
+      vctx.stroke();
     }
+    vctx.restore();
+  }
 
-    if (!originalImage) {
-        showStatus('❌ 画像をアップロードしてください', 'error');
-        return;
-    }
-
-    if (!selectedIndex || selectedIndex === '') {
-        showStatus('❌ 生地を選択してください', 'error');
-        return;
-    }
-
-    const fabric = fabricDatabase[selectedIndex];
-    
-    showStatus('🔄 AIがテント部分を解析中...（20〜30秒かかります）', 'info');
-    document.getElementById('detectBtn').disabled = true;
-
-    try {
-        const base64Image = imageToBase64(originalImage);
-
-        // ★ 修正: 送信画像のサイズも渡す（ピクセル座標が返された場合の補正用）
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                password: password,
-                imageBase64: base64Image,
-                fabricData: fabric,
-                imageWidth: canvas.width,
-                imageHeight: canvas.height
-            })
-        });
-
-        let result;
-        try {
-            result = await response.json();
-        } catch (jsonErr) {
-            throw new Error('サーバーからの応答をパースできませんでした。APIのURLを確認してください。');
-        }
-
-        if (!response.ok) {
-            throw new Error(result.error || `サーバーエラー (${response.status})`);
-        }
-
-        if (result.success && result.polygon) {
-            // ★ 正規化座標 (0.0〜1.0) をそのまま保持
-            detectedPolygon = result.polygon;
-
-            const confidence = Math.round((result.confidence || 0) * 100);
-            showStatus(`✅ テント検出完了（信頼度: ${confidence}%）${result.description ? ' - ' + result.description : ''}`, 'success');
-            
-            // デバッグ情報
-            showDebug(`検出ポリゴン (正規化座標): ${JSON.stringify(detectedPolygon.map(p => ({x: p.x.toFixed(3), y: p.y.toFixed(3)})))}`);
-
-            // 張替適用
-            applyFabricToPolygon(fabric);
-            
-            document.getElementById('actionButtons').style.display = 'flex';
-        } else {
-            throw new Error(result.error || '座標データが取得できませんでした');
-        }
-
-    } catch (error) {
-        showStatus('❌ エラー: ' + error.message, 'error');
-        console.error('Detection Error:', error);
-    } finally {
-        document.getElementById('detectBtn').disabled = false;
-    }
+  // 4. Vertices
+  points.forEach((p, i) => {
+    vctx.save();
+    // Shadow
+    vctx.beginPath();
+    vctx.arc(sx(p), sy(p), 13, 0, Math.PI * 2);
+    vctx.fillStyle = 'rgba(0,0,0,0.4)';
+    vctx.fill();
+    // Dot
+    vctx.beginPath();
+    vctx.arc(sx(p), sy(p), 10, 0, Math.PI * 2);
+    vctx.fillStyle = i === 0 ? '#e8ff47' : '#ffffff';
+    vctx.fill();
+    vctx.strokeStyle = '#111';
+    vctx.lineWidth = 1.5;
+    vctx.stroke();
+    // Label
+    vctx.font = 'bold 10px monospace';
+    vctx.fillStyle = '#111';
+    vctx.textAlign = 'center';
+    vctx.textBaseline = 'middle';
+    vctx.fillText(i + 1, sx(p), sy(p));
+    vctx.restore();
+  });
 }
 
-/* =========================
-   ポリゴンに生地を適用
-========================= */
-function applyFabricToPolygon(fabric) {
-    if (!detectedPolygon || detectedPolygon.length < 3) return;
-
-    // 元画像を描画
-    ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
-
-    // ★ 修正: 正規化座標 (0-1) をキャンバスピクセルに変換
-    // 正規化座標なので、直接 canvas.width / canvas.height を掛けるだけ
-    const canvasPoints = detectedPolygon.map(p => ({
-        x: p.x * canvas.width,
-        y: p.y * canvas.height
-    }));
-
-    // ポリゴンパスを作成してクリップ
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(canvasPoints[0].x, canvasPoints[0].y);
-    for (let i = 1; i < canvasPoints.length; i++) {
-        ctx.lineTo(canvasPoints[i].x, canvasPoints[i].y);
-    }
-    ctx.closePath();
-    ctx.clip();
-
-    // ★ 改善: 生地色を適用（multiply + 半透明で自然な見た目）
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = `rgb(${fabric.r}, ${fabric.g}, ${fabric.b})`;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // さらに色合いを強める
-    ctx.globalCompositeOperation = 'source-atop';
-    ctx.fillStyle = `rgba(${fabric.r}, ${fabric.g}, ${fabric.b}, 0.35)`;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.restore();
-
-    // 境界線を描画（白い点線）
-    ctx.setLineDash([6, 4]);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(canvasPoints[0].x, canvasPoints[0].y);
-    for (let i = 1; i < canvasPoints.length; i++) {
-        ctx.lineTo(canvasPoints[i].x, canvasPoints[i].y);
-    }
-    ctx.closePath();
-    ctx.stroke();
-    ctx.setLineDash([]);
+/* ============================================================
+   COORD HELPERS
+============================================================ */
+// Get position relative to wrap element
+function getWrapPos(e) {
+  const r = wrap.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
 }
 
-/* =========================
-   画像ダウンロード
-========================= */
+function screenToImg(x, y) {
+  return { x: (x - offX) / scale, y: (y - offY) / scale };
+}
+
+function hitTestScreen(x, y) {
+  const HIT = 24;
+  for (let i = points.length - 1; i >= 0; i--) {
+    const dx = points[i].x * scale + offX - x;
+    const dy = points[i].y * scale + offY - y;
+    if (Math.hypot(dx, dy) < HIT) return i;
+  }
+  return -1;
+}
+
+/* ============================================================
+   POINTER INPUT
+============================================================ */
+const activePointers = new Map();
+let dragIdx         = -1;
+let didDrag         = false;
+let panStart        = null;
+let pinchState      = null;
+let longTimer       = null;
+let pinchJustEnded  = false; // ピンチ直後の誤タップ防止フラグ
+
+wrap.addEventListener('pointerdown',   onPD, { passive: false });
+wrap.addEventListener('pointermove',   onPM, { passive: false });
+wrap.addEventListener('pointerup',     onPU, { passive: false });
+wrap.addEventListener('pointercancel', onPU, { passive: false });
+
+function onPD(e) {
+  e.preventDefault();
+  const pos = getWrapPos(e);
+  activePointers.set(e.pointerId, pos);
+
+  // 2本指 → ピンチ開始
+  if (activePointers.size === 2) {
+    cancelLong();
+    dragIdx        = -1;
+    panStart       = null;
+    pinchJustEnded = false;
+    const pts = [...activePointers.values()];
+    pinchState = {
+      dist:  Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y),
+      scale0: scale,
+      offX0: offX, offY0: offY,
+      mid0X: (pts[0].x + pts[1].x) / 2,
+      mid0Y: (pts[0].y + pts[1].y) / 2,
+    };
+    return;
+  }
+
+  // ピンチ直後は無視
+  if (pinchJustEnded) return;
+  if (!srcImg || pinchState) return;
+
+  const hit = hitTestScreen(pos.x, pos.y);
+
+  if (hit >= 0) {
+    // 既存頂点をタッチ → ドラッグ or 長押し削除
+    dragIdx = hit;
+    didDrag = false;
+    longTimer = setTimeout(() => {
+      if (!didDrag) {
+        points.splice(dragIdx, 1);
+        dragIdx = -1;
+        applied = false;
+        updatePointCount();
+        updateApplyBtn();
+        render();
+        showStatus('頂点を削除しました', 'info');
+      }
+    }, 600);
+  } else {
+    // 空白 → パン開始として記録（離した時に移動量が少なければ頂点追加）
+    panStart = { cx: pos.x, cy: pos.y, ox: offX, oy: offY };
+    didDrag  = false;
+  }
+}
+
+function onPM(e) {
+  e.preventDefault();
+  const pos = getWrapPos(e);
+  activePointers.set(e.pointerId, pos);
+
+  // ピンチ
+  if (pinchState && activePointers.size === 2) {
+    const pts  = [...activePointers.values()];
+    const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+    const midX = (pts[0].x + pts[1].x) / 2;
+    const midY = (pts[0].y + pts[1].y) / 2;
+    const ratio    = dist / pinchState.dist;
+    const newScale = Math.min(20, Math.max(0.05, pinchState.scale0 * ratio));
+    const imgMidX  = (pinchState.mid0X - pinchState.offX0) / pinchState.scale0;
+    const imgMidY  = (pinchState.mid0Y - pinchState.offY0) / pinchState.scale0;
+    scale = newScale;
+    offX  = midX - imgMidX * newScale;
+    offY  = midY - imgMidY * newScale;
+    updateZoomLabel();
+    render();
+    return;
+  }
+
+  // 頂点ドラッグ
+  if (dragIdx >= 0) {
+    didDrag = true;
+    cancelLong();
+    const ip = screenToImg(pos.x, pos.y);
+    points[dragIdx].x = Math.max(0, Math.min(srcImg.width,  ip.x));
+    points[dragIdx].y = Math.max(0, Math.min(srcImg.height, ip.y));
+    applied = false;
+    render();
+    return;
+  }
+
+  // パン（空白ドラッグ）
+  if (panStart) {
+    const dx = pos.x - panStart.cx;
+    const dy = pos.y - panStart.cy;
+    if (Math.hypot(dx, dy) > 6) didDrag = true; // 6px以上動いたらパン確定
+    offX = panStart.ox + dx;
+    offY = panStart.oy + dy;
+    render();
+  }
+}
+
+function onPU(e) {
+  e.preventDefault();
+  activePointers.delete(e.pointerId);
+  cancelLong();
+
+  // ピンチ終了ガード
+  if (pinchState && activePointers.size < 2) {
+    pinchState     = null;
+    pinchJustEnded = true;
+    setTimeout(() => { pinchJustEnded = false; }, 300);
+    dragIdx  = -1;
+    panStart = null;
+    return;
+  }
+
+  // 空白タップ（移動量6px未満）→ 頂点追加
+  if (panStart && !didDrag && srcImg && dragIdx < 0) {
+    const ip = screenToImg(panStart.cx, panStart.cy);
+    // 画像範囲内のみ追加
+    if (ip.x >= 0 && ip.x <= srcImg.width && ip.y >= 0 && ip.y <= srcImg.height) {
+      points.push({ x: ip.x, y: ip.y });
+      applied = false;
+      updatePointCount();
+      updateApplyBtn();
+      render();
+    }
+  }
+
+  dragIdx  = -1;
+  panStart = null;
+}
+
+function cancelLong() {
+  if (longTimer) { clearTimeout(longTimer); longTimer = null; }
+}
+
+// Mouse wheel zoom
+wrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  if (!srcImg) return;
+  const pos   = getWrapPos(e);
+  const delta = e.deltaY > 0 ? 0.85 : 1.18;
+  const imgX  = (pos.x - offX) / scale;
+  const imgY  = (pos.y - offY) / scale;
+  scale = Math.min(20, Math.max(0.05, scale * delta));
+  offX  = pos.x - imgX * scale;
+  offY  = pos.y - imgY * scale;
+  updateZoomLabel();
+  render();
+}, { passive: false });
+
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.code === 'KeyZ') { undoPoint(); e.preventDefault(); }
+});
+
+function updateZoomLabel() {
+  document.getElementById('zoom-indicator').textContent = Math.round(scale * 100) + '%';
+}
+
+/* ============================================================
+   FABRIC
+============================================================ */
+function applyFabric() {
+  if (!srcImg || points.length < 3 || !currentFabric) {
+    showStatus('3点以上の頂点と生地が必要です', 'error');
+    return;
+  }
+  applied = true;
+  render();
+  document.getElementById('download-btn').disabled = false;
+  showStatus('生地を適用しました ✓', 'success');
+}
+
+/* ============================================================
+   POINTS
+============================================================ */
+function undoPoint() {
+  if (!points.length) return;
+  points.pop();
+  applied = false;
+  updatePointCount();
+  updateApplyBtn();
+  render();
+}
+function clearPoints() {
+  points  = [];
+  applied = false;
+  updatePointCount();
+  updateApplyBtn();
+  render();
+}
+function updatePointCount() {
+  document.getElementById('point-count').textContent = points.length;
+}
+function updateApplyBtn() {
+  document.getElementById('apply-btn').disabled = !(srcImg && points.length >= 3 && currentFabric);
+}
+
+/* ============================================================
+   DOWNLOAD — full-res offscreen canvas
+============================================================ */
 function downloadImage() {
-    const link = document.createElement('a');
-    const timestamp = new Date().toISOString().slice(0,10);
-    link.download = `tent_simulation_${timestamp}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-    
-    showStatus('💾 画像を保存しました', 'success');
-    setTimeout(hideStatus, 3000);
+  if (!srcImg || !applied) { showStatus('先に生地を適用してください', 'error'); return; }
+  const pw = document.getElementById('password').value;
+  if (pw && pw !== APP_PW) { showStatus('パスワードが正しくありません', 'error'); return; }
+
+  const out  = document.createElement('canvas');
+  out.width  = srcImg.width;
+  out.height = srcImg.height;
+  const oc   = out.getContext('2d');
+
+  oc.drawImage(srcImg, 0, 0);
+
+  if (currentFabric && points.length >= 3) {
+    oc.save();
+    oc.beginPath();
+    oc.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) oc.lineTo(points[i].x, points[i].y);
+    oc.closePath();
+    oc.clip();
+    oc.globalCompositeOperation = 'multiply';
+    oc.globalAlpha = opacity;
+    oc.fillStyle = `rgb(${currentFabric.r},${currentFabric.g},${currentFabric.b})`;
+    oc.fillRect(0, 0, srcImg.width, srcImg.height);
+    oc.restore();
+  }
+
+  const link    = document.createElement('a');
+  link.download = `tent_sim_${new Date().toISOString().slice(0,10)}.png`;
+  link.href     = out.toDataURL('image/png');
+  link.click();
+  showStatus('保存しました 💾', 'success');
 }
 
-/* =========================
-   リセット
-========================= */
-function reset() {
-    originalImage = null;
-    detectedPolygon = null;
-    
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    document.getElementById('upload').value = '';
-    document.getElementById('canvasWrapper').style.display = 'none';
-    document.getElementById('actionButtons').style.display = 'none';
-    document.getElementById('detectBtn').disabled = true;
-    document.getElementById('debugInfo').className = 'debug-info';
-    
-    hideStatus();
+/* ============================================================
+   RESET
+============================================================ */
+function resetAll() {
+  srcImg = null; points = []; applied = false;
+  scale = 1; offX = 0; offY = 0;
+  empty.style.display = 'flex';
+  vctx.clearRect(0, 0, cssW, cssH);
+  updatePointCount();
+  updateApplyBtn();
+  document.getElementById('download-btn').disabled = true;
+  hideStatus();
 }
 
+/* ============================================================
+   STATUS
+============================================================ */
+let statusTimer = null;
+function showStatus(msg, type = 'info') {
+  const bar = document.getElementById('status-bar');
+  bar.textContent = msg;
+  bar.className   = 'show ' + type;
+  if (statusTimer) clearTimeout(statusTimer);
+  statusTimer = setTimeout(hideStatus, 3000);
+}
+function hideStatus() { document.getElementById('status-bar').className = ''; }
 </script>
-
 </body>
 </html>
