@@ -1470,10 +1470,10 @@ function renderOffscreen() {
 function downloadImage() {
   if (!srcImg || !applied) { showStatus('先に生地を適用してください', 'error'); return; }
 
-  // iOSはWeb Share API経由でカメラロールに保存
+  // iOSはシェアシート経由（「画像を保存」でカメラロールへ）
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
   if (isIOS) {
-    shareToSave();
+    shareImage();
     return;
   }
 
@@ -1486,27 +1486,7 @@ function downloadImage() {
   showStatus('保存しました 💾', 'success');
 }
 
-// iOS用：シェアシート経由でカメラロールへ
-async function shareToSave() {
-  const out = renderOffscreen();
-  out.toBlob(async (blob) => {
-    const fname = `tent_sim_${new Date().toISOString().slice(0,10)}.png`;
-    const file  = new File([blob], fname, { type: 'image/png' });
-    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({ files: [file], title: '西岡テント 張替シミュレーション' });
-        showStatus('保存・シェアしました 📸', 'success');
-      } catch(e) {
-        if (e.name !== 'AbortError') showStatus('キャンセルしました', 'info');
-      }
-    } else {
-      // フォールバック
-      const link = document.createElement('a');
-      link.download = fname; link.href = URL.createObjectURL(blob); link.click();
-      showStatus('保存しました 💾', 'success');
-    }
-  }, 'image/png');
-}
+
 
 /* ============================================================
    SHARE
