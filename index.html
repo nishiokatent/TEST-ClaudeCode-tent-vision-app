@@ -332,7 +332,7 @@
    CONFIG
 ============================================================ */
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQyMy5PUSJjr1f_fnQIpRIUagAp8Dw7Hqckr9422w_459qgQ_j4Bhw4LWygLVWTURa9n4Xl_gBNHAie/pub?output=csv";
-const APP_PW  = 'tent';
+const APP_PW  = 'tent2024';
 
 /* ============================================================
    ELEMENTS
@@ -487,6 +487,59 @@ function fitToScreen() {
 }
 
 /* ============================================================
+   COLOR HELPERS — blendに連動した彩度ブースト
+============================================================ */
+// RGBをHSLに変換
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, l = (max + min) / 2;
+  if (max === min) {
+    h = s = 0;
+  } else {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+  return [h, s, l];
+}
+function hue2rgb(p, q, t) {
+  if (t < 0) t += 1; if (t > 1) t -= 1;
+  if (t < 1/6) return p + (q - p) * 6 * t;
+  if (t < 1/2) return q;
+  if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+  return p;
+}
+function hslToRgb(h, s, l) {
+  let r, g, b;
+  if (s === 0) {
+    r = g = b = l;
+  } else {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+// blend値に応じて彩度ブーストしたRGBを返す
+// blend=0 → そのまま / blend=1 → 彩度+30%, 明度わずかに+
+function boostedColor(r, g, b, blendVal) {
+  if (blendVal <= 0) return [r, g, b];
+  const [h, s, l] = rgbToHsl(r, g, b);
+  const boost = blendVal * 0.30; // 最大+30%
+  const newS   = Math.min(1, s + boost);
+  const newL   = Math.min(0.88, l + blendVal * 0.06); // 最大+6%明るく
+  return hslToRgb(h, newS, newL);
+}
+
+/* ============================================================
    RENDER
 ============================================================ */
 function render() {
@@ -505,9 +558,9 @@ function render() {
   const sx = p => p.x * scale + offX;
   const sy = p => p.y * scale + offY;
 
-  // 2. Fabric fill（ハイブリッド合成）
+  // 2. Fabric fill（ハイブリッド合成 + 彩度連動）
   if (applied && currentFabric && points.length >= 3) {
-    const r = currentFabric.r, g = currentFabric.g, b = currentFabric.b;
+    const [r, g, b] = boostedColor(currentFabric.r, currentFabric.g, currentFabric.b, blend);
 
     // クリッピングパスを作成
     vctx.save();
@@ -518,25 +571,20 @@ function render() {
     vctx.clip();
 
     if (blend <= 0) {
-      // 純粋multiply
       vctx.globalCompositeOperation = 'multiply';
       vctx.globalAlpha = opacity;
       vctx.fillStyle = `rgb(${r},${g},${b})`;
       vctx.fillRect(offX, offY, iw, ih);
     } else if (blend >= 1) {
-      // 純粋source-over
       vctx.globalCompositeOperation = 'source-over';
       vctx.globalAlpha = opacity;
       vctx.fillStyle = `rgb(${r},${g},${b})`;
       vctx.fillRect(offX, offY, iw, ih);
     } else {
-      // ハイブリッド：multiplyレイヤー + source-overレイヤーをブレンド
-      // multiplyを(1-blend)の強さで
       vctx.globalCompositeOperation = 'multiply';
       vctx.globalAlpha = opacity * (1 - blend);
       vctx.fillStyle = `rgb(${r},${g},${b})`;
       vctx.fillRect(offX, offY, iw, ih);
-      // source-overをblendの強さで重ねる
       vctx.globalCompositeOperation = 'source-over';
       vctx.globalAlpha = opacity * blend;
       vctx.fillStyle = `rgb(${r},${g},${b})`;
@@ -1171,7 +1219,7 @@ function downloadImage() {
   oc.drawImage(srcImg, 0, 0);
 
   if (currentFabric && points.length >= 3) {
-    const r = currentFabric.r, g = currentFabric.g, b = currentFabric.b;
+    const [r, g, b] = boostedColor(currentFabric.r, currentFabric.g, currentFabric.b, blend);
     oc.save();
     oc.beginPath();
     oc.moveTo(points[0].x, points[0].y);
