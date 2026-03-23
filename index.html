@@ -356,6 +356,17 @@ let currentFabric = null;
 let opacity       = 0.75;
 let blend         = 0;   // 0=multiply, 1=source-over
 
+/* ラベル状態（画像座標系で保持） */
+let label = {
+  visible: false,
+  ix: 0, iy: 0,       // 画像座標での位置
+  fontSize: 28,        // 画像座標でのフォントサイズ
+  dragging: false,
+  pinching: false,
+  pinchDist0: 0,
+  pinchFontSize0: 0,
+};
+
 /* ============================================================
    CANVAS RESIZE — physical pixels = CSS pixels × DPR
 ============================================================ */
@@ -577,6 +588,11 @@ function render() {
     vctx.fillText(i + 1, sx(p), sy(p));
     vctx.restore();
   });
+
+  // 5. 生地ラベル
+  if (label.visible && currentFabric && applied) {
+    drawFabricLabel(vctx);
+  }
 }
 
 /* ============================================================
@@ -600,6 +616,123 @@ function hitTestScreen(x, y) {
     if (Math.hypot(dx, dy) < HIT) return i;
   }
   return -1;
+}
+
+/* ============================================================
+   FABRIC LABEL DRAW
+============================================================ */
+function getLabelMetrics() {
+  // スクリーン座標でのラベル位置・サイズを返す
+  const sx = label.ix * scale + offX;
+  const sy = label.iy * scale + offY;
+  const fs = label.fontSize * scale;  // screen font size
+  return { sx, sy, fs };
+}
+
+function drawFabricLabel(ctx) {
+  const f  = currentFabric;
+  const line1 = `${f.maker} ${f.name}`;
+  const line2 = `${f.code}  ${f.color}`;
+  const { sx, sy, fs } = getLabelMetrics();
+
+  ctx.save();
+
+  const pad   = fs * 0.55;
+  const lh    = fs * 1.35;
+  const serif = `'Noto Serif JP','Noto Sans JP',serif`;
+
+  ctx.font = `700 ${fs}px ${serif}`;
+  const w1 = ctx.measureText(line1).width;
+  ctx.font = `400 ${fs * 0.72}px ${serif}`;
+  const w2 = ctx.measureText(line2).width;
+  const boxW = Math.max(w1, w2) + pad * 2;
+  const boxH = lh + fs * 0.72 * 1.2 + pad * 1.8;
+
+  const bx = sx - boxW / 2;
+  const by = sy - boxH / 2;
+
+  // 影
+  ctx.shadowColor   = 'rgba(0,0,0,0.45)';
+  ctx.shadowBlur    = fs * 0.5;
+  ctx.shadowOffsetX = fs * 0.08;
+  ctx.shadowOffsetY = fs * 0.08;
+
+  // 背景：少し透けた和紙風クリーム
+  ctx.globalAlpha = 0.93;
+  ctx.fillStyle   = '#f5f0e8';
+  roundRect(ctx, bx, by, boxW, boxH, fs * 0.22);
+  ctx.fill();
+
+  ctx.shadowColor = 'transparent';
+  ctx.globalAlpha = 1;
+
+  // 左アクセントバー（生地色）
+  const barW = fs * 0.18;
+  ctx.fillStyle = `rgb(${f.r},${f.g},${f.b})`;
+  roundRect(ctx, bx, by, barW, boxH, fs * 0.1);
+  ctx.fill();
+
+  // 外枠
+  ctx.strokeStyle = 'rgba(150,120,80,0.35)';
+  ctx.lineWidth   = Math.max(0.8, fs * 0.04);
+  roundRect(ctx, bx, by, boxW, boxH, fs * 0.22);
+  ctx.stroke();
+
+  // テキスト：line1（メーカー＋品名）
+  ctx.font         = `700 ${fs}px ${serif}`;
+  ctx.fillStyle    = '#2a1a0a';
+  ctx.textAlign    = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(line1, bx + barW + pad * 0.9, by + pad * 0.8);
+
+  // 区切り線
+  const lineY = by + pad * 0.8 + lh * 0.85;
+  ctx.strokeStyle = 'rgba(150,120,80,0.25)';
+  ctx.lineWidth   = Math.max(0.5, fs * 0.025);
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(bx + barW + pad * 0.8, lineY);
+  ctx.lineTo(bx + boxW - pad * 0.5, lineY);
+  ctx.stroke();
+
+  // テキスト：line2（品番＋色名）
+  ctx.font      = `400 ${fs * 0.72}px ${serif}`;
+  ctx.fillStyle = '#5a4020';
+  ctx.fillText(line2, bx + barW + pad * 0.9, lineY + fs * 0.1);
+
+  // ドラッグ中はハイライト枠
+  if (label.dragging) {
+    ctx.strokeStyle = 'rgba(232,255,71,0.8)';
+    ctx.lineWidth   = Math.max(1.5, fs * 0.06);
+    ctx.setLineDash([fs * 0.2, fs * 0.1]);
+    roundRect(ctx, bx, by, boxW, boxH, fs * 0.22);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+
+  // ラベルの当たり判定用にサイズをキャッシュ
+  label._bx = bx; label._by = by; label._bw = boxW; label._bh = boxH;
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function hitTestLabel(sx, sy) {
+  if (!label.visible || !label._bw) return false;
+  return sx >= label._bx && sx <= label._bx + label._bw &&
+         sy >= label._by && sy <= label._by + label._bh;
 }
 
 /* ============================================================
@@ -628,14 +761,23 @@ function onPD(e) {
     cancelLong();
     dragIdx        = -1;
     panStart       = null;
+    label.dragging = false;
     pinchJustEnded = false;
     const pts = [...activePointers.values()];
+    const d   = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+    const mx  = (pts[0].x + pts[1].x) / 2;
+    const my  = (pts[0].y + pts[1].y) / 2;
+    // ラベルの上でのピンチ → サイズ変更
+    if (label.visible && hitTestLabel(mx, my)) {
+      label.pinching      = true;
+      label.pinchDist0    = d;
+      label.pinchFontSize0 = label.fontSize;
+    }
     pinchState = {
-      dist:  Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y),
+      dist:  d,
       scale0: scale,
       offX0: offX, offY0: offY,
-      mid0X: (pts[0].x + pts[1].x) / 2,
-      mid0Y: (pts[0].y + pts[1].y) / 2,
+      mid0X: mx, mid0Y: my,
     };
     return;
   }
@@ -644,10 +786,20 @@ function onPD(e) {
   if (pinchJustEnded) return;
   if (!srcImg || pinchState) return;
 
+  // ラベルのドラッグ判定（頂点より優先）
+  if (label.visible && hitTestLabel(pos.x, pos.y)) {
+    label.dragging = true;
+    label._dragStartX = pos.x;
+    label._dragStartY = pos.y;
+    label._dragIx0    = label.ix;
+    label._dragIy0    = label.iy;
+    didDrag = false;
+    return;
+  }
+
   const hit = hitTestScreen(pos.x, pos.y);
 
   if (hit >= 0) {
-    // 既存頂点をタッチ → ドラッグ or 長押し削除
     dragIdx = hit;
     didDrag = false;
     longTimer = setTimeout(() => {
@@ -662,7 +814,6 @@ function onPD(e) {
       }
     }, 600);
   } else {
-    // 空白 → パン開始として記録（離した時に移動量が少なければ頂点追加）
     panStart = { cx: pos.x, cy: pos.y, ox: offX, oy: offY };
     didDrag  = false;
   }
@@ -679,6 +830,16 @@ function onPM(e) {
     const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
     const midX = (pts[0].x + pts[1].x) / 2;
     const midY = (pts[0].y + pts[1].y) / 2;
+
+    // ラベルサイズ変更
+    if (label.pinching) {
+      label.fontSize = Math.min(120, Math.max(10,
+        label.pinchFontSize0 * (dist / label.pinchDist0)
+      ));
+      render();
+      return;
+    }
+
     const ratio    = dist / pinchState.dist;
     const newScale = Math.min(20, Math.max(0.05, pinchState.scale0 * ratio));
     const imgMidX  = (pinchState.mid0X - pinchState.offX0) / pinchState.scale0;
@@ -687,6 +848,17 @@ function onPM(e) {
     offX  = midX - imgMidX * newScale;
     offY  = midY - imgMidY * newScale;
     updateZoomLabel();
+    render();
+    return;
+  }
+
+  // ラベルドラッグ
+  if (label.dragging) {
+    didDrag = true;
+    const dx = (pos.x - label._dragStartX) / scale;
+    const dy = (pos.y - label._dragStartY) / scale;
+    label.ix = label._dragIx0 + dx;
+    label.iy = label._dragIy0 + dy;
     render();
     return;
   }
@@ -707,7 +879,7 @@ function onPM(e) {
   if (panStart) {
     const dx = pos.x - panStart.cx;
     const dy = pos.y - panStart.cy;
-    if (Math.hypot(dx, dy) > 6) didDrag = true; // 6px以上動いたらパン確定
+    if (Math.hypot(dx, dy) > 6) didDrag = true;
     offX = panStart.ox + dx;
     offY = panStart.oy + dy;
     render();
@@ -721,18 +893,26 @@ function onPU(e) {
 
   // ピンチ終了ガード
   if (pinchState && activePointers.size < 2) {
-    pinchState     = null;
-    pinchJustEnded = true;
+    pinchState         = null;
+    label.pinching     = false;
+    pinchJustEnded     = true;
     setTimeout(() => { pinchJustEnded = false; }, 300);
-    dragIdx  = -1;
-    panStart = null;
+    dragIdx        = -1;
+    panStart       = null;
+    label.dragging = false;
+    return;
+  }
+
+  // ラベルドラッグ終了
+  if (label.dragging) {
+    label.dragging = false;
+    render();
     return;
   }
 
   // 空白タップ（移動量6px未満）→ 頂点追加
   if (panStart && !didDrag && srcImg && dragIdx < 0) {
     const ip = screenToImg(panStart.cx, panStart.cy);
-    // 画像範囲内のみ追加
     if (ip.x >= 0 && ip.x <= srcImg.width && ip.y >= 0 && ip.y <= srcImg.height) {
       points.push({ x: ip.x, y: ip.y });
       applied = false;
@@ -782,6 +962,13 @@ function applyFabric() {
     return;
   }
   applied = true;
+  // ラベルを画像右下に初期配置（初回のみ）
+  if (!label.visible) {
+    label.ix      = srcImg.width  * 0.78;
+    label.iy      = srcImg.height * 0.90;
+    label.fontSize = Math.round(srcImg.width * 0.028);
+    label.visible = true;
+  }
   render();
   document.getElementById('download-btn').disabled = false;
   showStatus('生地を適用しました ✓', 'success');
@@ -858,6 +1045,15 @@ function downloadImage() {
     oc.restore();
   }
 
+  // ラベルを実寸で描画
+  if (label.visible && currentFabric) {
+    // offscreen用に一時的にscale=1, off=(0,0)で描画
+    const _scale = scale, _offX = offX, _offY = offY;
+    scale = 1; offX = 0; offY = 0;
+    drawFabricLabel(oc);
+    scale = _scale; offX = _offX; offY = _offY;
+  }
+
   const link    = document.createElement('a');
   link.download = `tent_sim_${new Date().toISOString().slice(0,10)}.png`;
   link.href     = out.toDataURL('image/png');
@@ -871,6 +1067,7 @@ function downloadImage() {
 function resetAll() {
   srcImg = null; points = []; applied = false;
   scale = 1; offX = 0; offY = 0;
+  label.visible = false;
   empty.style.display = 'flex';
   vctx.clearRect(0, 0, cssW, cssH);
   updatePointCount();
