@@ -75,6 +75,39 @@
   /* share button */
   .btn-share { background: #007aff; color: #fff; }
 
+  /* ── MODE SWITCHER ── */
+  #mode-switcher {
+    display: flex;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .mode-switch-btn {
+    flex: 1; padding: 9px 8px;
+    text-align: center; font-size: 0.75rem; font-weight: 700;
+    color: var(--text2); cursor: pointer; letter-spacing: 0.04em;
+    border: none; background: transparent; font-family: inherit;
+    border-bottom: 2px solid transparent; transition: all 0.2s;
+  }
+  .mode-switch-btn.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(232,255,71,0.05); }
+
+  /* ── NEW TENT MODE ── */
+  #new-tent-hint {
+    font-size: 0.68rem; color: var(--text2); line-height: 1.7;
+    padding: 7px 10px; background: var(--surface2); border-radius: 8px;
+    border-left: 2px solid var(--success); margin-bottom: 8px;
+  }
+  .nt-point-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 50%;
+    font-size: 0.68rem; font-weight: 700; margin-right: 4px;
+  }
+  .nt-A { background: #e8ff47; color: #0f0f0f; }
+  .nt-B { background: #47c8ff; color: #0f0f0f; }
+  .nt-C { background: #ff4747; color: #fff; }
+  .nt-GL { background: #ff9f00; color: #0f0f0f; }
+  .nt-GR { background: #ff9f00; color: #0f0f0f; }
+
   body {
     font-family: 'Noto Sans JP', sans-serif;
     background: var(--bg);
@@ -317,6 +350,12 @@
   </div>
 </header>
 
+<!-- モード切替 -->
+<div id="mode-switcher">
+  <button class="mode-switch-btn active" id="mode-replace" onclick="switchAppMode('replace')">🔄 張替シミュレーター</button>
+  <button class="mode-switch-btn" id="mode-new" onclick="switchAppMode('new')">✨ 新調シミュレーター</button>
+</div>
+
 <div id="canvas-wrap">
   <canvas id="view-canvas"></canvas>
   <div id="empty-state">
@@ -352,17 +391,56 @@
   </div>
 
   <div class="tab-content active" id="tab-draw">
-    <div class="hint">
-      📌 タップで頂点追加　　✋ 頂点ドラッグで移動　　🗑 長押しで削除<br>
-      🔍 2本指ピンチでズーム　　辺をタップで頂点挿入
+    <!-- 張替モード用 -->
+    <div id="replace-draw-ui">
+      <div class="hint">
+        📌 タップで頂点追加　　✋ 頂点ドラッグで移動　　🗑 長押しで削除<br>
+        🔍 2本指ピンチでズーム　　辺をタップで頂点挿入
+      </div>
+      <div class="ctrl-row">
+        <div id="polygon-tabs" style="display:flex;gap:4px;flex:1;flex-wrap:wrap;"></div>
+        <button class="btn btn-ghost" style="padding:6px 10px;font-size:0.72rem;" onclick="addPolygon()">＋テント</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-ghost"  onclick="undoPoint()">↩ 戻す</button>
+        <button class="btn btn-danger" onclick="clearPoints()">🗑 消去</button>
+      </div>
     </div>
-    <div class="ctrl-row">
-      <div id="polygon-tabs" style="display:flex;gap:4px;flex:1;flex-wrap:wrap;"></div>
-      <button class="btn btn-ghost" style="padding:6px 10px;font-size:0.72rem;" onclick="addPolygon()">＋テント</button>
-    </div>
-    <div class="btn-row">
-      <button class="btn btn-ghost"  onclick="undoPoint()">↩ 戻す</button>
-      <button class="btn btn-danger" onclick="clearPoints()">🗑 消去</button>
+    <!-- 新調モード用 -->
+    <div id="new-draw-ui" style="display:none;">
+      <div id="new-tent-hint">
+        <b>Step 1</b>　奥行きを感じる線の両端をタップ<br>
+        <span class="nt-point-badge nt-GL">1</span>左端　<span class="nt-point-badge nt-GR">2</span>右端　（地面・壁上端・屋根など）<br>
+        <b>Step 2</b>　テント間口をタップ<br>
+        <span class="nt-point-badge nt-A">3</span>左下端　<span class="nt-point-badge nt-B">4</span>右下端<br>
+        <b>Step 3</b>　<span class="nt-point-badge nt-C">5</span>取付高さをタップ → 自動生成
+      </div>
+      <div id="nt-step-status" style="font-size:0.72rem;color:var(--accent2);margin-bottom:6px;min-height:1.2em;"></div>
+      <div class="btn-row" style="margin-bottom:8px;">
+        <button class="btn btn-ghost" onclick="ntUndo()">↩ 戻す</button>
+        <button class="btn btn-danger" onclick="ntReset()">🗑 消去</button>
+      </div>
+      <button class="btn btn-primary" style="width:100%" id="nt-generate-btn" onclick="ntGenerate()" disabled>
+        ✨ テントを自動生成
+      </button>
+      <!-- 微調整スライダー（生成後に表示） -->
+      <div id="nt-adjust" style="display:none;margin-top:8px;">
+        <div class="ctrl-row">
+          <label class="ctrl-label">出幅</label>
+          <input type="range" id="nt-depth-slider" min="5" max="60" value="25" oninput="ntUpdateShape()">
+          <div class="range-val" id="nt-depth-val">25%</div>
+        </div>
+        <div class="ctrl-row">
+          <label class="ctrl-label">前高さ</label>
+          <input type="range" id="nt-front-h-slider" min="10" max="100" value="70" oninput="ntUpdateShape()">
+          <div class="range-val" id="nt-front-h-val">70%</div>
+        </div>
+        <div class="ctrl-row">
+          <label class="ctrl-label">地上高</label>
+          <input type="range" id="nt-ground-slider" min="0" max="60" value="0" oninput="ntUpdateShape()">
+          <div class="range-val" id="nt-ground-val">0%</div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -458,6 +536,330 @@ function endBefore(e) {
 }
 
 /* ============================================================
+   APP MODE SWITCH
+============================================================ */
+function switchAppMode(mode) {
+  appMode = mode;
+  document.getElementById('mode-replace').classList.toggle('active', mode === 'replace');
+  document.getElementById('mode-new').classList.toggle('active', mode === 'new');
+  document.getElementById('replace-draw-ui').style.display = mode === 'replace' ? 'block' : 'none';
+  document.getElementById('new-draw-ui').style.display     = mode === 'new'     ? 'block' : 'none';
+  // 新調モードに切り替えたらポリゴン頂点バッジを非表示
+  document.getElementById('point-count').parentElement.style.display = mode === 'replace' ? 'flex' : 'none';
+  render();
+}
+
+/* ============================================================
+   NEW TENT MODE
+============================================================ */
+
+// 3点タップからテント形状を自動計算して8頂点を生成
+function ntGenerate() {
+  if (ntPts.length < 5) return;
+  const GL = ntPts[0], GR = ntPts[1];
+  const A  = ntPts[2], B  = ntPts[3], C = ntPts[4];
+
+  const depthRatio   = +document.getElementById('nt-depth-slider').value / 100;
+  const frontHRatio  = +document.getElementById('nt-front-h-slider').value / 100;
+  const groundRatio  = +document.getElementById('nt-ground-slider').value / 100;
+
+  const span = Math.hypot(B.x-A.x, B.y-A.y);
+
+  // ── 消失点を2直線の交点で計算 ──
+  // 直線1: GL→GR の延長
+  // 直線2: A→B の延長
+  function lineIntersect(p1, p2, p3, p4) {
+    const d1x=p2.x-p1.x, d1y=p2.y-p1.y;
+    const d2x=p4.x-p3.x, d2y=p4.y-p3.y;
+    const cross = d1x*d2y - d1y*d2x;
+    if (Math.abs(cross) < 0.001) return null;
+    const t = ((p3.x-p1.x)*d2y - (p3.y-p1.y)*d2x) / cross;
+    return { x: p1.x+t*d1x, y: p1.y+t*d1y };
+  }
+  const VP = lineIntersect(GL, GR, A, B);
+
+  // 壁側・手前側の決定
+  const distCA = Math.hypot(C.x-A.x, C.y-A.y);
+  const distCB = Math.hypot(C.x-B.x, C.y-B.y);
+  const wallPt  = distCA < distCB ? A : B;
+  const frontPt = distCA < distCB ? B : A;
+  const wallH   = wallPt.y - C.y;
+
+  // 出幅方向と縮小率
+  let depthDirX, depthDirY, shrink;
+  const depthPx = span * depthRatio;
+
+  if (VP) {
+    // VP→frontPt 方向が「奥→手前」
+    const vpToFrontX = frontPt.x - VP.x;
+    const vpToFrontY = frontPt.y - VP.y;
+    const vpToFrontLen = Math.hypot(vpToFrontX, vpToFrontY);
+    depthDirX = vpToFrontX / vpToFrontLen;
+    depthDirY = vpToFrontY / vpToFrontLen;
+
+    // 出幅方向のY成分が負（上方向）なら反転
+    // テントは常にカメラ側（画像の下＝手前）に出るべき
+    if (depthDirY < 0) {
+      depthDirX = -depthDirX;
+      depthDirY = -depthDirY;
+    }
+
+    const vpDist = Math.hypot(frontPt.x-VP.x, frontPt.y-VP.y);
+    shrink = vpDist / (vpDist + depthPx);
+  } else {
+    depthDirX = 0; depthDirY = 1; shrink = 0.92;
+  }
+
+  // ── 固定3点 ──
+  const FL  = { x: wallPt.x,  y: wallPt.y };
+  const FR  = { x: frontPt.x, y: frontPt.y };
+  const FLT = { x: C.x, y: C.y };
+
+  // FRT: FLT→VP の直線上でFR.xに対応するY座標
+  // FLT→VP 直線: y = FLT.y + (VP.y-FLT.y)/(VP.x-FLT.x) * (x - FLT.x)
+  function yOnLine(p1, p2, x) {
+    if (Math.abs(p2.x - p1.x) < 0.1) return p1.y; // 垂直線
+    return p1.y + (p2.y - p1.y) / (p2.x - p1.x) * (x - p1.x);
+  }
+
+  const FRT = VP
+    ? { x: FR.x, y: yOnLine(FLT, VP, FR.x) }
+    : { x: FR.x, y: FR.y - wallH * shrink };
+
+  // 地上高オフセット（wallHに対する比率で上にずらす）
+  const groundOffset = wallH * groundRatio;
+
+  // ── BL・BR（出幅スライダーのみで動く・地上高で上下） ──
+  const midBotX = (FL.x+FR.x)/2 + depthDirX*depthPx;
+  const midBotY = (FL.y+FR.y)/2 + depthDirY*depthPx;
+  const BL = {
+    x: midBotX + (FL.x+depthDirX*depthPx - midBotX)*shrink,
+    y: midBotY + (FL.y+depthDirY*depthPx - midBotY)*shrink - groundOffset
+  };
+  const BR = {
+    x: midBotX + (FR.x+depthDirX*depthPx - midBotX)*shrink,
+    y: midBotY + (FR.y+depthDirY*depthPx - midBotY)*shrink - groundOffset
+  };
+
+  // ── BLT・BRT（消失点線上の高さ + 前高さ + 地上高） ──
+  // 地上高なし(groundOffset=0)のBL/BRベースY
+  const BLbaseY = BL.y + groundOffset;
+  const BRbaseY = BR.y + groundOffset;
+
+  // 消失点線上のBLT・BRTのY（地上高なし）
+  const BLTlineY = VP ? yOnLine(FLT, VP, BL.x) : BLbaseY - wallH*shrink;
+  const BRTlineY = VP ? yOnLine(FRT, VP, BR.x) : BRbaseY - wallH*shrink*shrink;
+
+  // 前高さ適用（地上高なし基準）→ 最後にgroundOffsetを同量引く
+  const BLT = {
+    x: BL.x,
+    y: (BLbaseY - (BLbaseY - BLTlineY) * frontHRatio) - groundOffset
+  };
+  const BRT = {
+    x: BR.x,
+    y: (BRbaseY - (BRbaseY - BRTlineY) * frontHRatio) - groundOffset
+  };
+
+  ntVerts = { FL, FR, FLT, FRT, BL, BR, BLT, BRT };
+  ntApplied = false;
+  document.getElementById('nt-adjust').style.display = 'block';
+  document.getElementById('nt-generate-btn').textContent = '🔄 再生成';
+  render();
+}
+
+// ステップガイドを更新
+function ntUpdateStepStatus() {
+  const el = document.getElementById('nt-step-status');
+  if (!el) return;
+  const msgs = [
+    '① 奥行き線の左端をタップ',
+    '② 奥行き線の右端をタップ',
+    '③ 間口の左下端をタップ',
+    '④ 間口の右下端をタップ',
+    '⑤ テント取付高さをタップ',
+    '✅ 5点完了！「テントを自動生成」を押してください',
+  ];
+  el.textContent = msgs[Math.min(ntPts.length, 5)];
+}
+
+// スライダー変更時に再生成
+function ntUpdateShape() {
+  document.getElementById('nt-depth-val').textContent    = document.getElementById('nt-depth-slider').value + '%';
+  document.getElementById('nt-front-h-val').textContent  = document.getElementById('nt-front-h-slider').value + '%';
+  document.getElementById('nt-ground-val').textContent   = document.getElementById('nt-ground-slider').value + '%';
+  if (ntPts.length === 5) ntGenerate();
+}
+
+// 戻す
+function ntUndo() {
+  if (ntVerts) {
+    ntVerts = null; ntApplied = false;
+    document.getElementById('nt-adjust').style.display = 'none';
+    document.getElementById('nt-generate-btn').textContent = '✨ テントを自動生成';
+  } else if (ntPts.length > 0) {
+    ntPts.pop();
+  }
+  document.getElementById('nt-generate-btn').disabled = ntPts.length < 5;
+  ntUpdateStepStatus();
+  render();
+}
+
+// 消去
+function ntReset() {
+  ntPts = []; ntVerts = null; ntApplied = false;
+  document.getElementById('nt-adjust').style.display = 'none';
+  document.getElementById('nt-generate-btn').disabled = true;
+  document.getElementById('nt-generate-btn').textContent = '✨ テントを自動生成';
+  ntUpdateStepStatus();
+  render();
+}
+
+// 8頂点のhitTest（スクリーン座標）
+function ntHitTestVert(sx, sy) {
+  if (!ntVerts) return null;
+  const HIT = 22;
+  for (const k of NT_KEYS) {
+    const p = ntVerts[k];
+    const px = p.x * scale + offX, py = p.y * scale + offY;
+    if (Math.hypot(sx - px, sy - py) < HIT) return k;
+  }
+  return null;
+}
+
+// 新調モードの描画
+function renderNewTent() {
+  if (!srcImg) return;
+
+  // 5点を描画（GL=橙, GR=橙, A=黄, B=水色, C=赤）
+  const ptColors = ['#ff9f00','#ff9f00','#e8ff47','#47c8ff','#ff4747'];
+  const ptLabels = ['1','2','3','4','5'];
+  ntPts.forEach((p, i) => {
+    const sx = p.x * scale + offX, sy = p.y * scale + offY;
+    vctx.save();
+    vctx.beginPath(); vctx.arc(sx, sy, 13, 0, Math.PI*2);
+    vctx.fillStyle = 'rgba(0,0,0,0.35)'; vctx.fill();
+    vctx.beginPath(); vctx.arc(sx, sy, 10, 0, Math.PI*2);
+    vctx.fillStyle = ptColors[i]; vctx.fill();
+    vctx.strokeStyle = '#111'; vctx.lineWidth = 1.5; vctx.stroke();
+    vctx.font = 'bold 10px monospace'; vctx.fillStyle = '#111';
+    vctx.textAlign = 'center'; vctx.textBaseline = 'middle';
+    vctx.fillText(ptLabels[i], sx, sy);
+    vctx.restore();
+  });
+
+  // 奥行き線（1→2）
+  if (ntPts.length >= 2) {
+    const p1 = ntPts[0], p2 = ntPts[1];
+    vctx.save();
+    vctx.beginPath();
+    vctx.moveTo(p1.x*scale+offX, p1.y*scale+offY);
+    vctx.lineTo(p2.x*scale+offX, p2.y*scale+offY);
+    vctx.strokeStyle = 'rgba(255,159,0,0.7)';
+    vctx.lineWidth = 2; vctx.setLineDash([6,4]); vctx.stroke();
+    vctx.restore();
+  }
+
+  // 間口線（3→4）
+  if (ntPts.length >= 4) {
+    const p3 = ntPts[2], p4 = ntPts[3];
+    vctx.save();
+    vctx.beginPath();
+    vctx.moveTo(p3.x*scale+offX, p3.y*scale+offY);
+    vctx.lineTo(p4.x*scale+offX, p4.y*scale+offY);
+    vctx.strokeStyle = 'rgba(232,255,71,0.7)';
+    vctx.lineWidth = 2; vctx.setLineDash([6,4]); vctx.stroke();
+    vctx.restore();
+  }
+
+  if (!ntVerts) return;
+
+  const V = ntVerts;
+  const sx = p => p.x * scale + offX;
+  const sy = p => p.y * scale + offY;
+
+  // ── 3面を描画 ──
+  if (currentFabric && ntApplied) {
+    const [r,g,b] = boostedColor(currentFabric.r, currentFabric.g, currentFabric.b, blend);
+    const ct = 1 + contrast / 100;
+    const ci = makeContrastedImage(srcImg, ct);
+
+    // 上面
+    vctx.save();
+    vctx.beginPath();
+    vctx.moveTo(sx(V.FLT),sy(V.FLT)); vctx.lineTo(sx(V.FRT),sy(V.FRT));
+    vctx.lineTo(sx(V.BRT),sy(V.BRT)); vctx.lineTo(sx(V.BLT),sy(V.BLT));
+    vctx.closePath(); vctx.clip();
+    if (ci) vctx.drawImage(ci, offX, offY, srcImg.width*scale, srcImg.height*scale);
+    else    vctx.drawImage(srcImg, offX, offY, srcImg.width*scale, srcImg.height*scale);
+    vctx.globalCompositeOperation = blend<=0?'multiply':'source-over';
+    vctx.globalAlpha = opacity * 0.85; // 上面は少し暗く
+    vctx.fillStyle = `rgb(${r},${g},${b})`; vctx.fillRect(offX,offY,srcImg.width*scale,srcImg.height*scale);
+    vctx.restore();
+
+    // 前妻面
+    vctx.save();
+    vctx.beginPath();
+    vctx.moveTo(sx(V.FL),sy(V.FL)); vctx.lineTo(sx(V.FR),sy(V.FR));
+    vctx.lineTo(sx(V.FRT),sy(V.FRT)); vctx.lineTo(sx(V.FLT),sy(V.FLT));
+    vctx.closePath(); vctx.clip();
+    if (ci) vctx.drawImage(ci, offX, offY, srcImg.width*scale, srcImg.height*scale);
+    else    vctx.drawImage(srcImg, offX, offY, srcImg.width*scale, srcImg.height*scale);
+    vctx.globalCompositeOperation = blend<=0?'multiply':'source-over';
+    vctx.globalAlpha = opacity;
+    vctx.fillStyle = `rgb(${r},${g},${b})`; vctx.fillRect(offX,offY,srcImg.width*scale,srcImg.height*scale);
+    vctx.restore();
+
+    // 奥妻面
+    vctx.save();
+    vctx.beginPath();
+    vctx.moveTo(sx(V.BL),sy(V.BL)); vctx.lineTo(sx(V.BR),sy(V.BR));
+    vctx.lineTo(sx(V.BRT),sy(V.BRT)); vctx.lineTo(sx(V.BLT),sy(V.BLT));
+    vctx.closePath(); vctx.clip();
+    if (ci) vctx.drawImage(ci, offX, offY, srcImg.width*scale, srcImg.height*scale);
+    else    vctx.drawImage(srcImg, offX, offY, srcImg.width*scale, srcImg.height*scale);
+    vctx.globalCompositeOperation = blend<=0?'multiply':'source-over';
+    vctx.globalAlpha = opacity * 0.75; // 奥面はさらに暗く
+    vctx.fillStyle = `rgb(${r},${g},${b})`; vctx.fillRect(offX,offY,srcImg.width*scale,srcImg.height*scale);
+    vctx.restore();
+  }
+
+  // ── ワイヤーフレーム ──
+  vctx.save();
+  vctx.strokeStyle = 'rgba(232,255,71,0.85)';
+  vctx.lineWidth = 1.8; vctx.setLineDash([]);
+  // 前妻
+  vctx.beginPath();
+  vctx.moveTo(sx(V.FL),sy(V.FL)); vctx.lineTo(sx(V.FR),sy(V.FR));
+  vctx.lineTo(sx(V.FRT),sy(V.FRT)); vctx.lineTo(sx(V.FLT),sy(V.FLT));
+  vctx.closePath(); vctx.stroke();
+  // 奥妻
+  vctx.beginPath();
+  vctx.moveTo(sx(V.BL),sy(V.BL)); vctx.lineTo(sx(V.BR),sy(V.BR));
+  vctx.lineTo(sx(V.BRT),sy(V.BRT)); vctx.lineTo(sx(V.BLT),sy(V.BLT));
+  vctx.closePath(); vctx.stroke();
+  // 繋ぎ線
+  [[V.FL,V.BL],[V.FR,V.BR],[V.FLT,V.BLT],[V.FRT,V.BRT]].forEach(([a,b])=>{
+    vctx.beginPath(); vctx.moveTo(sx(a),sy(a)); vctx.lineTo(sx(b),sy(b)); vctx.stroke();
+  });
+  vctx.restore();
+
+  // ── 8頂点ハンドル ──
+  NT_KEYS.forEach(k => {
+    const p = V[k];
+    vctx.save();
+    vctx.beginPath(); vctx.arc(sx(p),sy(p),12,0,Math.PI*2);
+    vctx.fillStyle='rgba(0,0,0,0.3)'; vctx.fill();
+    vctx.beginPath(); vctx.arc(sx(p),sy(p),9,0,Math.PI*2);
+    vctx.fillStyle = k.startsWith('B') ? '#47c8ff' : '#fff'; vctx.fill();
+    vctx.strokeStyle='#111'; vctx.lineWidth=1.5; vctx.stroke();
+    vctx.font='bold 7px monospace'; vctx.fillStyle='#111';
+    vctx.textAlign='center'; vctx.textBaseline='middle';
+    vctx.fillText(k, sx(p), sy(p));
+    vctx.restore();
+  });
+}
+
+/* ============================================================
    LOCALSTORAGE
 ============================================================ */
 function saveSettings() {
@@ -499,6 +901,9 @@ const empty = document.getElementById('empty-state');
    STATE
 ============================================================ */
 let srcImg        = null;
+// アプリモード: 'replace'=張替 / 'new'=新調
+let appMode       = 'replace';
+
 // 複数ポリゴン管理
 let polygons      = [{ points: [], applied: false }]; // 全テント
 let activeIdx     = 0;                                 // 編集中テント
@@ -514,8 +919,15 @@ let contrast      = 0;
 let showBefore    = false;  // Before/After表示フラグ
 
 // コントラスト処理済み画像キャッシュ
-let _contrastedCache     = null; // キャッシュされたcanvas
-let _contrastedCacheVal  = null; // キャッシュ時のcontrastの値
+let _contrastedCache     = null;
+let _contrastedCacheVal  = null;
+
+// ── 新調モード専用状態 ──
+let ntPts    = [];   // A, B, C の3点（画像座標）
+let ntVerts  = null; // 生成した8頂点 {FL,FR,FLT,FRT, BL,BR,BLT,BRT}
+let ntApplied = false;
+let ntDragIdx = null;  // ドラッグ中の頂点キー（'FL'等）、nullで未選択
+const NT_KEYS = ['FL','FR','FLT','FRT','BL','BR','BLT','BRT'];
 
 // アクティブポリゴンのpoints参照
 function pts() { return polygons[activeIdx].points; }
@@ -781,6 +1193,12 @@ function render() {
 
   // Before表示中は元画像のみ
   if (showBefore) return;
+
+  // 新調モード
+  if (appMode === 'new') {
+    renderNewTent();
+    return;
+  }
 
   if (points.length === 0) return;
 
@@ -1182,7 +1600,24 @@ function onPD(e) {
   if (pinchJustEnded) return;
   if (!srcImg || pinchState) return;
 
-  // ラベルのコーナーリサイズ判定（ドラッグより先に）
+  // ── 新調モード ──
+  if (appMode === 'new') {
+    // 8頂点ドラッグ
+    const ntHit = ntHitTestVert(pos.x, pos.y);
+    if (ntHit !== null) {
+      ntDragIdx = ntHit;
+      didDrag   = false;
+      return;
+    }
+    // 5点タップ or パン
+    panStart = { cx: pos.x, cy: pos.y, ox: offX, oy: offY };
+    if (ntPts.length < 5) {
+      const ip = screenToImg(pos.x, pos.y);
+      panStart._ntTapCandidate = { x: ip.x, y: ip.y };
+    }
+    didDrag = false;
+    return;
+  }
   if (label.visible && hitTestLabelCorner(pos.x, pos.y) >= 0) {
     label.resizing       = true;
     label._resizeStartX  = pos.x;
@@ -1254,6 +1689,18 @@ function onPM(e) {
     offX  = midX - imgMidX * newScale;
     offY  = midY - imgMidY * newScale;
     updateZoomLabel();
+    render();
+    return;
+  }
+
+  // 新調モード：8頂点ドラッグ
+  if (appMode === 'new' && ntDragIdx !== null) {
+    didDrag = true;
+    const ip = screenToImg(pos.x, pos.y);
+    ntVerts[ntDragIdx] = {
+      x: Math.max(0, Math.min(srcImg.width,  ip.x)),
+      y: Math.max(0, Math.min(srcImg.height, ip.y))
+    };
     render();
     return;
   }
@@ -1336,8 +1783,28 @@ function onPU(e) {
     return;
   }
 
+  // 新調モード：頂点ドラッグ終了
+  if (appMode === 'new' && ntDragIdx !== null) {
+    ntDragIdx = null;
+    render();
+    return;
+  }
+
   // 空白タップ（移動量6px未満）→ 辺への挿入 or 新規頂点追加
   if (panStart && !didDrag && srcImg && dragIdx < 0) {
+
+    // 新調モード：5点追加
+    if (appMode === 'new' && panStart._ntTapCandidate && ntPts.length < 5) {
+      const ip = panStart._ntTapCandidate;
+      if (ip.x >= 0 && ip.x <= srcImg.width && ip.y >= 0 && ip.y <= srcImg.height) {
+        ntPts.push({ x: ip.x, y: ip.y });
+        document.getElementById('nt-generate-btn').disabled = ntPts.length < 5;
+        ntUpdateStepStatus();
+        render();
+      }
+      panStart = null;
+      return;
+    }
     const ip = screenToImg(panStart.cx, panStart.cy);
     if (ip.x >= 0 && ip.x <= srcImg.width && ip.y >= 0 && ip.y <= srcImg.height) {
       // 辺ヒットテスト（3点以上あれば）
@@ -1401,20 +1868,27 @@ function updateZoomLabel() {
    FABRIC
 ============================================================ */
 function applyFabric() {
-  if (!srcImg || points.length < 3 || !currentFabric) {
-    showStatus('3点以上の頂点と生地が必要です', 'error');
-    return;
+  if (!currentFabric) { showStatus('生地を選択してください', 'error'); return; }
+
+  if (appMode === 'new') {
+    // 新調モード
+    if (!ntVerts) { showStatus('先にテントを生成してください', 'error'); return; }
+    ntApplied = true;
+  } else {
+    // 張替モード
+    if (!srcImg || points.length < 3) { showStatus('3点以上の頂点と生地が必要です', 'error'); return; }
+    applied = true;
   }
-  applied = true;
+
   // ラベルを画像右下に初期配置（初回のみ）
-  if (!label.visible) {
+  if (!label.visible && srcImg) {
     label.ix      = srcImg.width  * 0.78;
     label.iy      = srcImg.height * 0.90;
     label.fontSize = Math.round(srcImg.width * 0.028);
     label.visible = true;
   }
   render();
-  document.getElementById('before-btn').style.display = 'block';
+  document.getElementById('before-btn').style.display = appMode === 'replace' ? 'block' : 'none';
   document.getElementById('download-btn').disabled = false;
   document.getElementById('share-btn').disabled    = false;
   showStatus('生地を適用しました ✓', 'success');
@@ -1454,42 +1928,61 @@ function renderOffscreen() {
   out.height = srcImg.height;
   const oc   = out.getContext('2d');
   oc.drawImage(srcImg, 0, 0);
-  if (currentFabric && points.length >= 3) {
-    const [r, g, b] = boostedColor(currentFabric.r, currentFabric.g, currentFabric.b, blend);
-    const ct = 1 + contrast / 100;
 
-    // オフスクリーンでコントラスト処理
-    const contrastedImg = makeContrastedImage(srcImg, ct);
+  const [r, g, b] = currentFabric
+    ? boostedColor(currentFabric.r, currentFabric.g, currentFabric.b, blend)
+    : [0,0,0];
+  const ct = 1 + contrast / 100;
+  const ci = makeContrastedImage(srcImg, ct);
 
+  function fillFace(pathFn, alpha) {
     oc.save();
-    oc.beginPath();
-    oc.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) oc.lineTo(points[i].x, points[i].y);
-    oc.closePath();
-    oc.clip();
-    if (contrastedImg) {
-      oc.drawImage(contrastedImg, 0, 0);
-    } else {
-      oc.drawImage(srcImg, 0, 0);
-    }
+    oc.beginPath(); pathFn();
+    oc.closePath(); oc.clip();
+    if (ci) oc.drawImage(ci, 0, 0); else oc.drawImage(srcImg, 0, 0);
     if (blend <= 0) {
-      oc.globalCompositeOperation = 'multiply'; oc.globalAlpha = opacity;
-      oc.fillStyle = `rgb(${r},${g},${b})`; oc.fillRect(0, 0, srcImg.width, srcImg.height);
+      oc.globalCompositeOperation = 'multiply'; oc.globalAlpha = alpha;
+      oc.fillStyle = `rgb(${r},${g},${b})`; oc.fillRect(0,0,srcImg.width,srcImg.height);
     } else if (blend >= 1) {
-      oc.globalCompositeOperation = 'source-over'; oc.globalAlpha = opacity;
-      oc.fillStyle = `rgb(${r},${g},${b})`; oc.fillRect(0, 0, srcImg.width, srcImg.height);
+      oc.globalCompositeOperation = 'source-over'; oc.globalAlpha = alpha;
+      oc.fillStyle = `rgb(${r},${g},${b})`; oc.fillRect(0,0,srcImg.width,srcImg.height);
     } else {
-      oc.globalCompositeOperation = 'multiply'; oc.globalAlpha = opacity * (1 - blend);
-      oc.fillStyle = `rgb(${r},${g},${b})`; oc.fillRect(0, 0, srcImg.width, srcImg.height);
-      oc.globalCompositeOperation = 'source-over'; oc.globalAlpha = opacity * blend;
-      oc.fillStyle = `rgb(${r},${g},${b})`; oc.fillRect(0, 0, srcImg.width, srcImg.height);
+      oc.globalCompositeOperation = 'multiply'; oc.globalAlpha = alpha * (1-blend);
+      oc.fillStyle = `rgb(${r},${g},${b})`; oc.fillRect(0,0,srcImg.width,srcImg.height);
+      oc.globalCompositeOperation = 'source-over'; oc.globalAlpha = alpha * blend;
+      oc.fillStyle = `rgb(${r},${g},${b})`; oc.fillRect(0,0,srcImg.width,srcImg.height);
     }
     oc.restore();
   }
+
+  if (appMode === 'new' && ntVerts && ntApplied && currentFabric) {
+    const V = ntVerts;
+    // 上面
+    fillFace(() => {
+      oc.moveTo(V.FLT.x,V.FLT.y); oc.lineTo(V.FRT.x,V.FRT.y);
+      oc.lineTo(V.BRT.x,V.BRT.y); oc.lineTo(V.BLT.x,V.BLT.y);
+    }, opacity * 0.85);
+    // 前妻面
+    fillFace(() => {
+      oc.moveTo(V.FL.x,V.FL.y); oc.lineTo(V.FR.x,V.FR.y);
+      oc.lineTo(V.FRT.x,V.FRT.y); oc.lineTo(V.FLT.x,V.FLT.y);
+    }, opacity);
+    // 奥妻面
+    fillFace(() => {
+      oc.moveTo(V.BL.x,V.BL.y); oc.lineTo(V.BR.x,V.BR.y);
+      oc.lineTo(V.BRT.x,V.BRT.y); oc.lineTo(V.BLT.x,V.BLT.y);
+    }, opacity * 0.75);
+  } else if (appMode === 'replace' && currentFabric && points.length >= 3) {
+    fillFace(() => {
+      oc.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) oc.lineTo(points[i].x, points[i].y);
+    }, opacity);
+  }
+
   if (label.visible && currentFabric) {
     const _s = scale, _x = offX, _y = offY;
     scale = 1; offX = 0; offY = 0;
-    drawFabricLabel(oc, false); // ← 保存時はハンドル非表示
+    drawFabricLabel(oc, false);
     scale = _s; offX = _x; offY = _y;
   }
   return out;
@@ -1499,14 +1992,12 @@ function renderOffscreen() {
    DOWNLOAD
 ============================================================ */
 function downloadImage() {
-  if (!srcImg || !applied) { showStatus('先に生地を適用してください', 'error'); return; }
+  const isApplied = appMode === 'new' ? (ntVerts && ntApplied) : applied;
+  if (!srcImg || !isApplied) { showStatus('先に生地を適用してください', 'error'); return; }
 
-  // iOSはシェアシート経由（「画像を保存」でカメラロールへ）
+  // iOSはシェアシート経由
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  if (isIOS) {
-    shareImage();
-    return;
-  }
+  if (isIOS) { shareImage(); return; }
 
   // PC・Android：通常ダウンロード
   const out  = renderOffscreen();
@@ -1523,7 +2014,8 @@ function downloadImage() {
    SHARE
 ============================================================ */
 async function shareImage() {
-  if (!srcImg || !applied) { showStatus('先に生地を適用してください', 'error'); return; }
+  const isApplied = appMode === 'new' ? (ntVerts && ntApplied) : applied;
+  if (!srcImg || !isApplied) { showStatus('先に生地を適用してください', 'error'); return; }
   const out = renderOffscreen();
   out.toBlob(async (blob) => {
     const fname = `tent_sim_${new Date().toISOString().slice(0,10)}.png`;
@@ -1554,6 +2046,12 @@ function resetAll() {
   scale = 1; offX = 0; offY = 0;
   label.visible = false;
   showBefore = false;
+  // 新調モードリセット
+  ntPts = []; ntVerts = null; ntApplied = false; ntDragIdx = null;
+  document.getElementById('nt-adjust').style.display = 'none';
+  document.getElementById('nt-generate-btn').disabled = true;
+  document.getElementById('nt-generate-btn').textContent = '✨ テントを自動生成';
+  ntUpdateStepStatus();
   empty.style.display = 'flex';
   vctx.clearRect(0, 0, cssW, cssH);
   updatePointCount();
