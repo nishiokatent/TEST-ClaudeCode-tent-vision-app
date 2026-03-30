@@ -618,9 +618,10 @@ function ntGenerate() {
   const frontPt = distCA < distCB ? B : A;
   const wallH   = wallPt.y - C.y;
 
-  // 間口中心で左右判定（WLU.xが中心より左→W側が左妻）
+  // 間口中心で左右判定
+  // WLU.xが中心より右→W側が右妻（wIsLeft=false）
   const midX = (A.x + B.x) / 2;
-  const wIsLeft = wallPt.x < midX; // W側が左妻かどうか
+  const wIsLeft = wallPt.x < midX; // W側の間口点が左にある→W=左妻
 
   // 出幅方向と縮小率
   let depthDirX, depthDirY, shrink;
@@ -881,11 +882,11 @@ function renderNewTent() {
   vctx.save();
   vctx.strokeStyle = 'rgba(232,255,71,0.85)';
   vctx.lineWidth = 1.8; vctx.setLineDash([]);
-  // 壁面輪郭（奥）
+  // 壁面輪郭（奥）- closePathしない（WR→WLの線を引かない）
   vctx.beginPath();
   vctx.moveTo(sx(V.WL),sy(V.WL)); vctx.lineTo(sx(V.WLU),sy(V.WLU));
   vctx.lineTo(sx(V.WRU),sy(V.WRU)); vctx.lineTo(sx(V.WR),sy(V.WR));
-  vctx.closePath(); vctx.stroke();
+  vctx.stroke();
   // 前面輪郭
   vctx.beginPath();
   vctx.moveTo(sx(V.FL),sy(V.FL)); vctx.lineTo(sx(V.FLU),sy(V.FLU));
