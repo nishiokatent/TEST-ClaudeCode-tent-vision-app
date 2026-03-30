@@ -1685,6 +1685,25 @@ function onPD(e) {
 
   // ── 新調モード ──
   if (appMode === 'new') {
+    // ラベルのコーナーリサイズ判定（最優先）
+    if (label.visible && hitTestLabelCorner(pos.x, pos.y) >= 0) {
+      label.resizing        = true;
+      label._resizeStartX   = pos.x;
+      label._resizeStartY   = pos.y;
+      label._resizeFontSize0 = label.fontSize;
+      didDrag = false;
+      return;
+    }
+    // ラベルドラッグ判定
+    if (label.visible && hitTestLabel(pos.x, pos.y)) {
+      label.dragging     = true;
+      label._dragStartX  = pos.x;
+      label._dragStartY  = pos.y;
+      label._dragIx0     = label.ix;
+      label._dragIy0     = label.iy;
+      didDrag = false;
+      return;
+    }
     // 8頂点ドラッグ
     const ntHit = ntHitTestVert(pos.x, pos.y);
     if (ntHit !== null) {
