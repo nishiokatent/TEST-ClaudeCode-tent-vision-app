@@ -932,6 +932,11 @@ function renderNewTent() {
     }
     vctx.restore();
   });
+
+  // 生地ラベル（適用後に表示）
+  if (ntApplied && currentFabric && label.visible) {
+    drawFabricLabel(vctx, true);
+  }
 }
 
 /* ============================================================
@@ -1958,12 +1963,18 @@ function applyFabric() {
     applied = true;
   }
 
-  // ラベルを画像右下に初期配置（初回のみ）
+  // ラベルを初期配置（初回のみ）
   if (!label.visible && srcImg) {
-    label.ix      = srcImg.width  * 0.78;
-    label.iy      = srcImg.height * 0.90;
+    if (appMode === 'new' && ntVerts) {
+      // 新調モード：前面下端（FRU付近）に配置
+      label.ix      = ntVerts.FRU.x + srcImg.width * 0.02;
+      label.iy      = ntVerts.FRU.y - srcImg.height * 0.05;
+    } else {
+      label.ix      = srcImg.width  * 0.78;
+      label.iy      = srcImg.height * 0.90;
+    }
     label.fontSize = Math.round(srcImg.width * 0.028);
-    label.visible = true;
+    label.visible  = true;
   }
   render();
   document.getElementById('before-btn').style.display = appMode === 'replace' ? 'block' : 'none';
