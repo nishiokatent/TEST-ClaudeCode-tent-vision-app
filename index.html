@@ -410,9 +410,9 @@
     <div id="new-draw-ui" style="display:none;">
       <div id="new-tent-hint">
         <b>Step 1</b>　奥行きを感じる線の両端をタップ<br>
-        <span class="nt-point-badge nt-GL">1</span>左端　<span class="nt-point-badge nt-GR">2</span>右端　（地面・壁上端・屋根など）<br>
-        <b>Step 2</b>　テント間口をタップ<br>
-        <span class="nt-point-badge nt-A">3</span>左下端　<span class="nt-point-badge nt-B">4</span>右下端<br>
+        <span class="nt-point-badge nt-GL">1</span><span class="nt-point-badge nt-GR">2</span>　（地面・壁上端・屋根など）<br>
+        <b>Step 2</b>　テント間口の両端をタップ<br>
+        <span class="nt-point-badge nt-A">3</span><span class="nt-point-badge nt-B">4</span><br>
         <b>Step 3</b>　<span class="nt-point-badge nt-C">5</span>取付高さをタップ → 自動生成
       </div>
       <div id="nt-step-status" style="font-size:0.72rem;color:var(--accent2);margin-bottom:6px;min-height:1.2em;"></div>
@@ -452,23 +452,53 @@
         <option value="">読み込み中...</option>
       </select>
     </div>
-    <div class="ctrl-row">
-      <label class="ctrl-label">質感</label>
-      <input type="range" id="blend-slider" min="0" max="100" value="0" oninput="onBlendChange()">
-      <div class="range-val" id="blend-val">自然</div>
+
+    <!-- 張替モード用スライダー -->
+    <div id="replace-fabric-ui">
+      <div class="ctrl-row">
+        <label class="ctrl-label">質感</label>
+        <input type="range" id="blend-slider" min="0" max="100" value="0" oninput="onBlendChange()">
+        <div class="range-val" id="blend-val">自然</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:0.62rem;color:var(--text2);margin:-4px 0 8px 56px;padding-right:42px;">
+        <span>← 陰影残す</span><span>発色重視 →</span>
+      </div>
+      <div class="ctrl-row">
+        <label class="ctrl-label">影</label>
+        <input type="range" id="contrast-slider" min="-50" max="100" value="0"
+          oninput="onContrastInput()" onchange="onContrastChange()">
+        <div class="range-val" id="contrast-val">標準</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:0.62rem;color:var(--text2);margin:-4px 0 8px 56px;padding-right:42px;">
+        <span>← 影を弱める</span><span>影を強調 →</span>
+      </div>
     </div>
-    <div style="display:flex;justify-content:space-between;font-size:0.62rem;color:var(--text2);margin:-4px 0 8px 56px;padding-right:42px;">
-      <span>← 陰影残す</span><span>発色重視 →</span>
+
+    <!-- 新調モード用スライダー -->
+    <div id="new-fabric-ui" style="display:none;">
+      <div style="font-size:0.68rem;color:var(--text2);margin:4px 0 6px;">面ごとの明るさ調整</div>
+      <div class="ctrl-row">
+        <label class="ctrl-label">流れ面</label>
+        <input type="range" id="nt-bright-nagare" min="-80" max="80" value="10" oninput="ntBrightChange()">
+        <div class="range-val" id="nt-bright-nagare-val">+10</div>
+      </div>
+      <div class="ctrl-row">
+        <label class="ctrl-label">前面</label>
+        <input type="range" id="nt-bright-front" min="-80" max="80" value="0" oninput="ntBrightChange()">
+        <div class="range-val" id="nt-bright-front-val">0</div>
+      </div>
+      <div class="ctrl-row">
+        <label class="ctrl-label" id="nt-left-label">左妻面</label>
+        <input type="range" id="nt-bright-left" min="-80" max="80" value="-10" oninput="ntBrightChange()">
+        <div class="range-val" id="nt-bright-left-val">-10</div>
+      </div>
+      <div class="ctrl-row">
+        <label class="ctrl-label" id="nt-right-label">右妻面</label>
+        <input type="range" id="nt-bright-right" min="-80" max="80" value="-20" oninput="ntBrightChange()">
+        <div class="range-val" id="nt-bright-right-val">-20</div>
+      </div>
     </div>
-    <div class="ctrl-row">
-      <label class="ctrl-label">影</label>
-      <input type="range" id="contrast-slider" min="-50" max="100" value="0"
-        oninput="onContrastInput()" onchange="onContrastChange()">
-      <div class="range-val" id="contrast-val">標準</div>
-    </div>
-    <div style="display:flex;justify-content:space-between;font-size:0.62rem;color:var(--text2);margin:-4px 0 8px 56px;padding-right:42px;">
-      <span>← 影を弱める</span><span>影を強調 →</span>
-    </div>
+
     <button class="btn btn-primary" style="width:100%;margin-top:4px" id="apply-btn" onclick="applyFabric()" disabled>
       🎨 生地を適用
     </button>
@@ -544,7 +574,8 @@ function switchAppMode(mode) {
   document.getElementById('mode-new').classList.toggle('active', mode === 'new');
   document.getElementById('replace-draw-ui').style.display = mode === 'replace' ? 'block' : 'none';
   document.getElementById('new-draw-ui').style.display     = mode === 'new'     ? 'block' : 'none';
-  // 新調モードに切り替えたらポリゴン頂点バッジを非表示
+  document.getElementById('replace-fabric-ui').style.display = mode === 'replace' ? 'block' : 'none';
+  document.getElementById('new-fabric-ui').style.display     = mode === 'new'     ? 'block' : 'none';
   document.getElementById('point-count').parentElement.style.display = mode === 'replace' ? 'flex' : 'none';
   render();
 }
@@ -578,96 +609,124 @@ function ntGenerate() {
   }
   const VP = lineIntersect(GL, GR, A, B);
 
-  // 壁側・手前側の決定
+  // ── 固定4点（壁側） ──
+  // CがA・Bのどちらに近いか→壁側決定
   const distCA = Math.hypot(C.x-A.x, C.y-A.y);
   const distCB = Math.hypot(C.x-B.x, C.y-B.y);
   const wallPt  = distCA < distCB ? A : B;
   const frontPt = distCA < distCB ? B : A;
   const wallH   = wallPt.y - C.y;
 
+  // 間口中心で左右判定（WLU.xが中心より左→W側が左妻）
+  const midX = (A.x + B.x) / 2;
+  const wIsLeft = wallPt.x < midX; // W側が左妻かどうか
+
   // 出幅方向と縮小率
   let depthDirX, depthDirY, shrink;
   const depthPx = span * depthRatio;
 
   if (VP) {
-    // VP→frontPt 方向が「奥→手前」
     const vpToFrontX = frontPt.x - VP.x;
     const vpToFrontY = frontPt.y - VP.y;
     const vpToFrontLen = Math.hypot(vpToFrontX, vpToFrontY);
     depthDirX = vpToFrontX / vpToFrontLen;
     depthDirY = vpToFrontY / vpToFrontLen;
-
-    // 出幅方向のY成分が負（上方向）なら反転
-    // テントは常にカメラ側（画像の下＝手前）に出るべき
-    if (depthDirY < 0) {
-      depthDirX = -depthDirX;
-      depthDirY = -depthDirY;
-    }
-
+    if (depthDirY < 0) { depthDirX = -depthDirX; depthDirY = -depthDirY; }
     const vpDist = Math.hypot(frontPt.x-VP.x, frontPt.y-VP.y);
     shrink = vpDist / (vpDist + depthPx);
   } else {
     depthDirX = 0; depthDirY = 1; shrink = 0.92;
   }
 
-  // ── 固定3点 ──
-  const FL  = { x: wallPt.x,  y: wallPt.y };
-  const FR  = { x: frontPt.x, y: frontPt.y };
-  const FLT = { x: C.x, y: C.y };
+  // ── 壁側固定4点 ──
+  const WLU = { x: wallPt.x,  y: wallPt.y };   // 壁・左右・下
+  const WL  = { x: C.x, y: C.y };               // 壁・左右・上(=C)
 
-  // FRT: FLT→VP の直線上でFR.xに対応するY座標
-  // FLT→VP 直線: y = FLT.y + (VP.y-FLT.y)/(VP.x-FLT.x) * (x - FLT.x)
+  // WR: WL→VP の直線上でWRU.xに対応するY
   function yOnLine(p1, p2, x) {
-    if (Math.abs(p2.x - p1.x) < 0.1) return p1.y; // 垂直線
+    if (Math.abs(p2.x - p1.x) < 0.1) return p1.y;
     return p1.y + (p2.y - p1.y) / (p2.x - p1.x) * (x - p1.x);
   }
+  const WRU = { x: frontPt.x, y: frontPt.y };
+  const WR  = VP
+    ? { x: WRU.x, y: yOnLine(WL, VP, WRU.x) }
+    : { x: WRU.x, y: WRU.y - wallH * shrink };
 
-  const FRT = VP
-    ? { x: FR.x, y: yOnLine(FLT, VP, FR.x) }
-    : { x: FR.x, y: FR.y - wallH * shrink };
-
-  // 地上高オフセット（wallHに対する比率で上にずらす）
+  // 地上高オフセット
   const groundOffset = wallH * groundRatio;
 
-  // ── BL・BR（出幅スライダーのみで動く・地上高で上下） ──
-  const midBotX = (FL.x+FR.x)/2 + depthDirX*depthPx;
-  const midBotY = (FL.y+FR.y)/2 + depthDirY*depthPx;
-  const BL = {
-    x: midBotX + (FL.x+depthDirX*depthPx - midBotX)*shrink,
-    y: midBotY + (FL.y+depthDirY*depthPx - midBotY)*shrink - groundOffset
+  // ── 前側4点（出幅方向に移動・青4点） ──
+  const midBotX = (WLU.x+WRU.x)/2 + depthDirX*depthPx;
+  const midBotY = (WLU.y+WRU.y)/2 + depthDirY*depthPx;
+  const FLU = {
+    x: midBotX + (WLU.x+depthDirX*depthPx - midBotX)*shrink,
+    y: midBotY + (WLU.y+depthDirY*depthPx - midBotY)*shrink - groundOffset
   };
-  const BR = {
-    x: midBotX + (FR.x+depthDirX*depthPx - midBotX)*shrink,
-    y: midBotY + (FR.y+depthDirY*depthPx - midBotY)*shrink - groundOffset
-  };
-
-  // ── BLT・BRT（消失点線上の高さ + 前高さ + 地上高） ──
-  // 地上高なし(groundOffset=0)のBL/BRベースY
-  const BLbaseY = BL.y + groundOffset;
-  const BRbaseY = BR.y + groundOffset;
-
-  // 消失点線上のBLT・BRTのY（地上高なし）
-  const BLTlineY = VP ? yOnLine(FLT, VP, BL.x) : BLbaseY - wallH*shrink;
-  const BRTlineY = VP ? yOnLine(FRT, VP, BR.x) : BRbaseY - wallH*shrink*shrink;
-
-  // 前高さ適用（地上高なし基準）→ 最後にgroundOffsetを同量引く
-  const BLT = {
-    x: BL.x,
-    y: (BLbaseY - (BLbaseY - BLTlineY) * frontHRatio) - groundOffset
-  };
-  const BRT = {
-    x: BR.x,
-    y: (BRbaseY - (BRbaseY - BRTlineY) * frontHRatio) - groundOffset
+  const FRU = {
+    x: midBotX + (WRU.x+depthDirX*depthPx - midBotX)*shrink,
+    y: midBotY + (WRU.y+depthDirY*depthPx - midBotY)*shrink - groundOffset
   };
 
-  ntVerts = { FL, FR, FLT, FRT, BL, BR, BLT, BRT };
+  // FL・FR（前高さスライダー＋地上高）
+  const FLUbaseY = FLU.y + groundOffset;
+  const FRUbaseY = FRU.y + groundOffset;
+  const FLlineY  = VP ? yOnLine(WL, VP, FLU.x) : FLUbaseY - wallH*shrink;
+  const FRlineY  = VP ? yOnLine(WR, VP, FRU.x) : FRUbaseY - wallH*shrink*shrink;
+  const FL = {
+    x: FLU.x,
+    y: (FLUbaseY - (FLUbaseY - FLlineY) * frontHRatio) - groundOffset
+  };
+  const FR = {
+    x: FRU.x,
+    y: (FRUbaseY - (FRUbaseY - FRlineY) * frontHRatio) - groundOffset
+  };
+
+  ntVerts = { WLU, WL, WRU, WR, FLU, FL, FRU, FR };
+  ntVerts._wIsLeft = wIsLeft; // 左右判定をvertsに保存
   ntApplied = false;
+
+  // 左右ラベル更新
+  ntUpdateSideLabels(wIsLeft);
+
   document.getElementById('nt-adjust').style.display = 'block';
   document.getElementById('nt-generate-btn').textContent = '🔄 再生成';
   render();
 }
 
-// ステップガイドを更新
+// 左右妻ラベルを自動更新
+function ntUpdateSideLabels(wIsLeft) {
+  const leftLabel  = document.getElementById('nt-left-label');
+  const rightLabel = document.getElementById('nt-right-label');
+  if (!leftLabel || !rightLabel) return;
+  if (wIsLeft) {
+    leftLabel.textContent  = '左妻面(W)';
+    rightLabel.textContent = '右妻面(F)';
+  } else {
+    leftLabel.textContent  = '左妻面(F)';
+    rightLabel.textContent = '右妻面(W)';
+  }
+}
+
+// 新調モード明るさスライダー変更
+function ntBrightChange() {
+  const ids = ['nagare','front','left','right'];
+  ids.forEach(id => {
+    const v = +document.getElementById(`nt-bright-${id}`).value;
+    document.getElementById(`nt-bright-${id}-val`).textContent = (v > 0 ? '+' : '') + v;
+  });
+  if (ntApplied) render();
+}
+
+// 明るさ調整：単色オーバーレイで明暗を表現
+function applyBrightness(ctx, bright, x, y, w, h) {
+  if (Math.abs(bright) < 1) return;
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = Math.abs(bright) / 100;
+  ctx.fillStyle = bright > 0 ? '#ffffff' : '#000000';
+  ctx.fillRect(x, y, w, h);
+  ctx.restore();
+}
 function ntUpdateStepStatus() {
   const el = document.getElementById('nt-step-status');
   if (!el) return;
@@ -780,65 +839,63 @@ function renderNewTent() {
   // ── 3面を描画 ──
   if (currentFabric && ntApplied) {
     const [r,g,b] = boostedColor(currentFabric.r, currentFabric.g, currentFabric.b, blend);
-    const ct = 1 + contrast / 100;
-    const ci = makeContrastedImage(srcImg, ct);
+    const iw = srcImg.width*scale, ih = srcImg.height*scale;
+    const bNagare = +document.getElementById('nt-bright-nagare').value;
+    const bFront  = +document.getElementById('nt-bright-front').value;
+    const bLeft   = +document.getElementById('nt-bright-left').value;
+    const bRight  = +document.getElementById('nt-bright-right').value;
+    const wIsLeft = V._wIsLeft;
 
-    // 上面
-    vctx.save();
-    vctx.beginPath();
-    vctx.moveTo(sx(V.FLT),sy(V.FLT)); vctx.lineTo(sx(V.FRT),sy(V.FRT));
-    vctx.lineTo(sx(V.BRT),sy(V.BRT)); vctx.lineTo(sx(V.BLT),sy(V.BLT));
-    vctx.closePath(); vctx.clip();
-    if (ci) vctx.drawImage(ci, offX, offY, srcImg.width*scale, srcImg.height*scale);
-    else    vctx.drawImage(srcImg, offX, offY, srcImg.width*scale, srcImg.height*scale);
-    vctx.globalCompositeOperation = blend<=0?'multiply':'source-over';
-    vctx.globalAlpha = opacity * 0.85; // 上面は少し暗く
-    vctx.fillStyle = `rgb(${r},${g},${b})`; vctx.fillRect(offX,offY,srcImg.width*scale,srcImg.height*scale);
-    vctx.restore();
+    // 面を塗る共通関数（不透明ベタ塗り→生地色→明るさ調整）
+    function fillFaceNT(pts, bright) {
+      vctx.save();
+      vctx.beginPath();
+      vctx.moveTo(sx(pts[0]), sy(pts[0]));
+      pts.slice(1).forEach(p => vctx.lineTo(sx(p), sy(p)));
+      vctx.closePath();
+      vctx.clip();
+      // 1. 不透明な生地色でベタ塗り（透けない）
+      vctx.globalCompositeOperation = 'source-over';
+      vctx.globalAlpha = 1;
+      vctx.fillStyle = `rgb(${r},${g},${b})`;
+      vctx.fillRect(offX, offY, iw, ih);
+      // 2. 明るさ調整（白or黒を重ねる）
+      if (Math.abs(bright) >= 1) {
+        vctx.globalAlpha = Math.abs(bright) / 100;
+        vctx.fillStyle = bright > 0 ? '#ffffff' : '#000000';
+        vctx.fillRect(offX, offY, iw, ih);
+      }
+      vctx.restore();
+    }
 
-    // 前妻面
-    vctx.save();
-    vctx.beginPath();
-    vctx.moveTo(sx(V.FL),sy(V.FL)); vctx.lineTo(sx(V.FR),sy(V.FR));
-    vctx.lineTo(sx(V.FRT),sy(V.FRT)); vctx.lineTo(sx(V.FLT),sy(V.FLT));
-    vctx.closePath(); vctx.clip();
-    if (ci) vctx.drawImage(ci, offX, offY, srcImg.width*scale, srcImg.height*scale);
-    else    vctx.drawImage(srcImg, offX, offY, srcImg.width*scale, srcImg.height*scale);
-    vctx.globalCompositeOperation = blend<=0?'multiply':'source-over';
-    vctx.globalAlpha = opacity;
-    vctx.fillStyle = `rgb(${r},${g},${b})`; vctx.fillRect(offX,offY,srcImg.width*scale,srcImg.height*scale);
-    vctx.restore();
-
-    // 奥妻面
-    vctx.save();
-    vctx.beginPath();
-    vctx.moveTo(sx(V.BL),sy(V.BL)); vctx.lineTo(sx(V.BR),sy(V.BR));
-    vctx.lineTo(sx(V.BRT),sy(V.BRT)); vctx.lineTo(sx(V.BLT),sy(V.BLT));
-    vctx.closePath(); vctx.clip();
-    if (ci) vctx.drawImage(ci, offX, offY, srcImg.width*scale, srcImg.height*scale);
-    else    vctx.drawImage(srcImg, offX, offY, srcImg.width*scale, srcImg.height*scale);
-    vctx.globalCompositeOperation = blend<=0?'multiply':'source-over';
-    vctx.globalAlpha = opacity * 0.75; // 奥面はさらに暗く
-    vctx.fillStyle = `rgb(${r},${g},${b})`; vctx.fillRect(offX,offY,srcImg.width*scale,srcImg.height*scale);
-    vctx.restore();
+    // 流れ面: WL-FL-FR-WR
+    fillFaceNT([V.WL, V.FL, V.FR, V.WR], bNagare);
+    // 前面: FL-FLU-FRU-FR
+    fillFaceNT([V.FL, V.FLU, V.FRU, V.FR], bFront);
+    // W妻面: WL-WLU-FLU-FL
+    const bW = wIsLeft ? bLeft : bRight;
+    fillFaceNT([V.WL, V.WLU, V.FLU, V.FL], bW);
+    // F妻面: WR-WRU-FRU-FR
+    const bF = wIsLeft ? bRight : bLeft;
+    fillFaceNT([V.WR, V.WRU, V.FRU, V.FR], bF);
   }
 
   // ── ワイヤーフレーム ──
   vctx.save();
   vctx.strokeStyle = 'rgba(232,255,71,0.85)';
   vctx.lineWidth = 1.8; vctx.setLineDash([]);
-  // 前妻
+  // 壁面（奥）
   vctx.beginPath();
-  vctx.moveTo(sx(V.FL),sy(V.FL)); vctx.lineTo(sx(V.FR),sy(V.FR));
-  vctx.lineTo(sx(V.FRT),sy(V.FRT)); vctx.lineTo(sx(V.FLT),sy(V.FLT));
+  vctx.moveTo(sx(V.WL),sy(V.WL)); vctx.lineTo(sx(V.WLU),sy(V.WLU));
+  vctx.lineTo(sx(V.WRU),sy(V.WRU)); vctx.lineTo(sx(V.WR),sy(V.WR));
   vctx.closePath(); vctx.stroke();
-  // 奥妻
+  // 前面
   vctx.beginPath();
-  vctx.moveTo(sx(V.BL),sy(V.BL)); vctx.lineTo(sx(V.BR),sy(V.BR));
-  vctx.lineTo(sx(V.BRT),sy(V.BRT)); vctx.lineTo(sx(V.BLT),sy(V.BLT));
+  vctx.moveTo(sx(V.FL),sy(V.FL)); vctx.lineTo(sx(V.FLU),sy(V.FLU));
+  vctx.lineTo(sx(V.FRU),sy(V.FRU)); vctx.lineTo(sx(V.FR),sy(V.FR));
   vctx.closePath(); vctx.stroke();
   // 繋ぎ線
-  [[V.FL,V.BL],[V.FR,V.BR],[V.FLT,V.BLT],[V.FRT,V.BRT]].forEach(([a,b])=>{
+  [[V.WL,V.FL],[V.WR,V.FR],[V.WLU,V.FLU],[V.WRU,V.FRU]].forEach(([a,b])=>{
     vctx.beginPath(); vctx.moveTo(sx(a),sy(a)); vctx.lineTo(sx(b),sy(b)); vctx.stroke();
   });
   vctx.restore();
@@ -850,7 +907,7 @@ function renderNewTent() {
     vctx.beginPath(); vctx.arc(sx(p),sy(p),12,0,Math.PI*2);
     vctx.fillStyle='rgba(0,0,0,0.3)'; vctx.fill();
     vctx.beginPath(); vctx.arc(sx(p),sy(p),9,0,Math.PI*2);
-    vctx.fillStyle = k.startsWith('B') ? '#47c8ff' : '#fff'; vctx.fill();
+    vctx.fillStyle = k.startsWith('F') ? '#47c8ff' : '#fff'; vctx.fill();
     vctx.strokeStyle='#111'; vctx.lineWidth=1.5; vctx.stroke();
     vctx.font='bold 7px monospace'; vctx.fillStyle='#111';
     vctx.textAlign='center'; vctx.textBaseline='middle';
@@ -927,7 +984,9 @@ let ntPts    = [];   // A, B, C の3点（画像座標）
 let ntVerts  = null; // 生成した8頂点 {FL,FR,FLT,FRT, BL,BR,BLT,BRT}
 let ntApplied = false;
 let ntDragIdx = null;  // ドラッグ中の頂点キー（'FL'等）、nullで未選択
-const NT_KEYS = ['FL','FR','FLT','FRT','BL','BR','BLT','BRT'];
+const NT_KEYS = ['WLU','WL','WRU','WR','FLU','FL','FRU','FR'];
+// WLU=壁左下, WL=壁左上, WRU=壁右下, WR=壁右上
+// FLU=前左下, FL=前左上, FRU=前右下, FR=前右上
 
 // アクティブポリゴンのpoints参照
 function pts() { return polygons[activeIdx].points; }
