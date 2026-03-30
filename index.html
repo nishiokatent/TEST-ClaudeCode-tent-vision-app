@@ -865,10 +865,8 @@ function renderNewTent() {
       vctx.restore();
     }
 
-    // 描画順：奥→手前（流れ面→妻面→前面）
-    // WL-WLU-WR の三角形（流れ面の一部・壁側上の隙間）
-    fillFaceNT([V.WL, V.WLU, V.WR], bNagare);
-    // 流れ面: WL-WR-FR-FL（4点）
+    // 描画順：奥→手前
+    // 流れ面: WL-WR-FR-FL
     fillFaceNT([V.WL, V.WR, V.FR, V.FL], bNagare);
     // W妻面: WL-WLU-FLU-FL
     const bW = wIsLeft ? bLeft : bRight;
@@ -876,7 +874,7 @@ function renderNewTent() {
     // F妻面: WR-WRU-FRU-FR
     const bF = wIsLeft ? bRight : bLeft;
     fillFaceNT([V.WR, V.WRU, V.FRU, V.FR], bF);
-    // 前面: FL-FR-FRU-FLU（一番手前）
+    // 前面: FL-FR-FRU-FLU
     fillFaceNT([V.FL, V.FR, V.FRU, V.FLU], bFront);
   }
 
@@ -2061,9 +2059,7 @@ function renderOffscreen() {
       oc.restore();
     }
 
-    // WL-WLU-WR の三角形（流れ面の隙間を埋める）
-    fillFaceNTOff([V.WL,V.WLU,V.WR], bNagare);
-    // 流れ面（4点）
+    // 流れ面
     fillFaceNTOff([V.WL,V.WR,V.FR,V.FL], bNagare);
     // W妻面
     const bW = wIsLeft ? bLeft : bRight;
