@@ -746,7 +746,98 @@ function ntUpdateShape() {
   document.getElementById('nt-depth-val').textContent    = document.getElementById('nt-depth-slider').value + '%';
   document.getElementById('nt-front-h-val').textContent  = document.getElementById('nt-front-h-slider').value + '%';
   document.getElementById('nt-ground-val').textContent   = document.getElementById('nt-ground-slider').value + '%';
-  if (ntPts.length === 5) ntGenerate();
+  if (!ntVerts) {
+    // まだ生成されていない場合はntGenerateを呼ぶ
+    if (ntPts.length === 5) ntGenerate();
+    return;
+  }
+  // 生成済みの場合は8頂点を直接更新（微調整を保持）
+  ntAdjustShape();
+}
+
+// 生成済みの8頂点をスライダーで直接更新（微調整を保持）
+function ntAdjustShape() {
+  if (!ntVerts || ntPts.length < 5) return;
+
+  const GL = ntPts[0], GR = ntPts[1];
+  const A  = ntPts[2], B  = ntPts[3], C = ntPts[4];
+
+  const depthRatio  = +document.getElementById('nt-depth-slider').value / 100;
+  const frontHRatio = +document.getElementById('nt-front-h-slider').value / 100;
+  const groundRatio = +document.getElementById('nt-ground-slider').value / 100;
+
+  const span = Math.hypot(B.x-A.x, B.y-A.y);
+
+  // 消失点再計算
+  function lineIntersect(p1,p2,p3,p4) {
+    const d1x=p2.x-p1.x,d1y=p2.y-p1.y,d2x=p4.x-p3.x,d2y=p4.y-p3.y;
+    const cross=d1x*d2y-d1y*d2x;
+    if(Math.abs(cross)<0.001) return null;
+    const t=((p3.x-p1.x)*d2y-(p3.y-p1.y)*d2x)/cross;
+    return {x:p1.x+t*d1x,y:p1.y+t*d1y};
+  }
+  const VP = lineIntersect(GL,GR,A,B);
+
+  const distCA = Math.hypot(C.x-A.x,C.y-A.y);
+  const distCB = Math.hypot(C.x-B.x,C.y-B.y);
+  const wallPt  = distCA<distCB ? A : B;
+  const frontPt = distCA<distCB ? B : A;
+  const wallH   = wallPt.y - C.y;
+
+  let depthDirX, depthDirY, shrink;
+  const depthPx = span * depthRatio;
+
+  if (VP) {
+    const vpToFrontX = frontPt.x-VP.x, vpToFrontY = frontPt.y-VP.y;
+    const vpToFrontLen = Math.hypot(vpToFrontX,vpToFrontY);
+    depthDirX = vpToFrontX/vpToFrontLen;
+    depthDirY = vpToFrontY/vpToFrontLen;
+    if (depthDirY < 0) { depthDirX=-depthDirX; depthDirY=-depthDirY; }
+    shrink = vpToFrontLen / (vpToFrontLen + depthPx);
+  } else {
+    depthDirX=0; depthDirY=1; shrink=0.92;
+  }
+
+  function yOnLine(p1,p2,x) {
+    if(Math.abs(p2.x-p1.x)<0.1) return p1.y;
+    return p1.y+(p2.y-p1.y)/(p2.x-p1.x)*(x-p1.x);
+  }
+
+  const groundOffset = wallH * groundRatio;
+
+  // 壁側固定点（WLU・WL・WR）は変えない
+  const WLU = ntVerts.WLU;
+  const WL  = ntVerts.WL;
+  const WRU = ntVerts.WRU;
+  const WR  = ntVerts.WR;
+
+  // 前側4点を再計算
+  const midBotX = (WLU.x+WRU.x)/2 + depthDirX*depthPx;
+  const midBotY = (WLU.y+WRU.y)/2 + depthDirY*depthPx;
+  const FLU = {
+    x: midBotX + (WLU.x+depthDirX*depthPx-midBotX)*shrink,
+    y: midBotY + (WLU.y+depthDirY*depthPx-midBotY)*shrink - groundOffset
+  };
+  const FRU = {
+    x: midBotX + (WRU.x+depthDirX*depthPx-midBotX)*shrink,
+    y: midBotY + (WRU.y+depthDirY*depthPx-midBotY)*shrink - groundOffset
+  };
+
+  const FLUbaseY = FLU.y + groundOffset;
+  const FRUbaseY = FRU.y + groundOffset;
+  const FLlineY  = VP ? yOnLine(WL,VP,FLU.x) : FLUbaseY - wallH*shrink;
+  const FRlineY  = VP ? yOnLine(WR,VP,FRU.x) : FRUbaseY - wallH*shrink*shrink;
+  const FL = { x: FLU.x, y: (FLUbaseY-(FLUbaseY-FLlineY)*frontHRatio) - groundOffset };
+  const FR = { x: FRU.x, y: (FRUbaseY-(FRUbaseY-FRlineY)*frontHRatio) - groundOffset };
+
+  // 前側4点のみ更新（壁側は微調整済みのままキープ）
+  ntVerts.FLU = FLU;
+  ntVerts.FL  = FL;
+  ntVerts.FRU = FRU;
+  ntVerts.FR  = FR;
+
+  ntApplied = false;
+  render();
 }
 
 // 戻す
