@@ -852,22 +852,25 @@ function renderNewTent() {
       vctx.moveTo(sx(pts[0]), sy(pts[0]));
       pts.slice(1).forEach(p => vctx.lineTo(sx(p), sy(p)));
       vctx.closePath();
-      vctx.clip();
+      // clip()の代わりにパスをそのまま使う
       vctx.globalCompositeOperation = 'source-over';
       vctx.globalAlpha = 1;
       vctx.fillStyle = `rgb(${r},${g},${b})`;
-      vctx.fillRect(offX, offY, iw, ih);
+      vctx.fill();
       if (Math.abs(bright) >= 1) {
+        // 明るさ調整：同じパスに白/黒を重ねる
+        vctx.beginPath();
+        vctx.moveTo(sx(pts[0]), sy(pts[0]));
+        pts.slice(1).forEach(p => vctx.lineTo(sx(p), sy(p)));
+        vctx.closePath();
         vctx.globalAlpha = Math.abs(bright) / 100;
         vctx.fillStyle = bright > 0 ? '#ffffff' : '#000000';
-        vctx.fillRect(offX, offY, iw, ih);
+        vctx.fill();
       }
       vctx.restore();
     }
 
-    // 描画順：奥→手前
-    // 流れ面: WL-WR-FR-FL
-    fillFaceNT([V.WL, V.WR, V.FR, V.FL], bNagare);
+    // 描画順：妻面→前面→流れ面（流れ面が一番上に来る）
     // W妻面: WL-WLU-FLU-FL
     const bW = wIsLeft ? bLeft : bRight;
     fillFaceNT([V.WL, V.WLU, V.FLU, V.FL], bW);
@@ -876,6 +879,8 @@ function renderNewTent() {
     fillFaceNT([V.WR, V.WRU, V.FRU, V.FR], bF);
     // 前面: FL-FR-FRU-FLU
     fillFaceNT([V.FL, V.FR, V.FRU, V.FLU], bFront);
+    // 流れ面: WL-WR-FR-FL（最後に描いて上書きされないようにする）
+    fillFaceNT([V.WL, V.WR, V.FR, V.FL], bNagare);
   }
 
   // ── ワイヤーフレーム ──
@@ -905,8 +910,8 @@ function renderNewTent() {
   [[V.WL,V.FL],[V.WR,V.FR]].forEach(([a,b])=>{
     vctx.beginPath(); vctx.moveTo(sx(a),sy(a)); vctx.lineTo(sx(b),sy(b)); vctx.stroke();
   });
-  // 妻面の縦線（WLU-FLU, WRU-FRU）
-  [[V.WLU,V.FLU],[V.WRU,V.FRU]].forEach(([a,b])=>{
+  // 妻面の縦線（WLU-FLUのみ・WRU-FRUは描かない）
+  [[V.WLU,V.FLU]].forEach(([a,b])=>{
     vctx.beginPath(); vctx.moveTo(sx(a),sy(a)); vctx.lineTo(sx(b),sy(b)); vctx.stroke();
   });
   vctx.restore();
@@ -2046,21 +2051,23 @@ function renderOffscreen() {
       oc.beginPath();
       oc.moveTo(pts[0].x, pts[0].y);
       pts.slice(1).forEach(p => oc.lineTo(p.x, p.y));
-      oc.closePath(); oc.clip();
+      oc.closePath();
       oc.globalCompositeOperation = 'source-over';
       oc.globalAlpha = 1;
       oc.fillStyle = `rgb(${r},${g},${b})`;
-      oc.fillRect(0, 0, iw, ih);
+      oc.fill();
       if (Math.abs(bright) >= 1) {
+        oc.beginPath();
+        oc.moveTo(pts[0].x, pts[0].y);
+        pts.slice(1).forEach(p => oc.lineTo(p.x, p.y));
+        oc.closePath();
         oc.globalAlpha = Math.abs(bright) / 100;
         oc.fillStyle = bright > 0 ? '#ffffff' : '#000000';
-        oc.fillRect(0, 0, iw, ih);
+        oc.fill();
       }
       oc.restore();
     }
 
-    // 流れ面
-    fillFaceNTOff([V.WL,V.WR,V.FR,V.FL], bNagare);
     // W妻面
     const bW = wIsLeft ? bLeft : bRight;
     fillFaceNTOff([V.WL,V.WLU,V.FLU,V.FL], bW);
@@ -2069,6 +2076,8 @@ function renderOffscreen() {
     fillFaceNTOff([V.WR,V.WRU,V.FRU,V.FR], bF);
     // 前面
     fillFaceNTOff([V.FL,V.FR,V.FRU,V.FLU], bFront);
+    // 流れ面（最後）
+    fillFaceNTOff([V.WL,V.WR,V.FR,V.FL], bNagare);
   } else if (appMode === 'replace' && currentFabric && points.length >= 3) {
     fillFace(() => {
       oc.moveTo(points[0].x, points[0].y);
