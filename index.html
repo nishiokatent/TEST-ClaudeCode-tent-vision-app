@@ -577,6 +577,7 @@ function switchAppMode(mode) {
   document.getElementById('replace-fabric-ui').style.display = mode === 'replace' ? 'block' : 'none';
   document.getElementById('new-fabric-ui').style.display     = mode === 'new'     ? 'block' : 'none';
   document.getElementById('point-count').parentElement.style.display = mode === 'replace' ? 'flex' : 'none';
+  updateApplyBtn();
   render();
 }
 
@@ -682,12 +683,10 @@ function ntGenerate() {
   };
 
   ntVerts = { WLU, WL, WRU, WR, FLU, FL, FRU, FR };
-  ntVerts._wIsLeft = wIsLeft; // 左右判定をvertsに保存
+  ntVerts._wIsLeft = wIsLeft;
   ntApplied = false;
-
-  // 左右ラベル更新
   ntUpdateSideLabels(wIsLeft);
-
+  updateApplyBtn();
   document.getElementById('nt-adjust').style.display = 'block';
   document.getElementById('nt-generate-btn').textContent = '🔄 再生成';
   render();
@@ -846,7 +845,6 @@ function renderNewTent() {
     const bRight  = +document.getElementById('nt-bright-right').value;
     const wIsLeft = V._wIsLeft;
 
-    // 面を塗る共通関数（不透明ベタ塗り→生地色→明るさ調整）
     function fillFaceNT(pts, bright) {
       vctx.save();
       vctx.beginPath();
@@ -854,12 +852,10 @@ function renderNewTent() {
       pts.slice(1).forEach(p => vctx.lineTo(sx(p), sy(p)));
       vctx.closePath();
       vctx.clip();
-      // 1. 不透明な生地色でベタ塗り（透けない）
       vctx.globalCompositeOperation = 'source-over';
       vctx.globalAlpha = 1;
       vctx.fillStyle = `rgb(${r},${g},${b})`;
       vctx.fillRect(offX, offY, iw, ih);
-      // 2. 明るさ調整（白or黒を重ねる）
       if (Math.abs(bright) >= 1) {
         vctx.globalAlpha = Math.abs(bright) / 100;
         vctx.fillStyle = bright > 0 ? '#ffffff' : '#000000';
@@ -868,34 +864,39 @@ function renderNewTent() {
       vctx.restore();
     }
 
-    // 流れ面: WL-FL-FR-WR
-    fillFaceNT([V.WL, V.FL, V.FR, V.WR], bNagare);
-    // 前面: FL-FLU-FRU-FR
-    fillFaceNT([V.FL, V.FLU, V.FRU, V.FR], bFront);
+    // 描画順：奥→手前（流れ面→妻面→前面）
+    // 流れ面: WL-WR-FR-FL（上面）
+    fillFaceNT([V.WL, V.WR, V.FR, V.FL], bNagare);
     // W妻面: WL-WLU-FLU-FL
     const bW = wIsLeft ? bLeft : bRight;
     fillFaceNT([V.WL, V.WLU, V.FLU, V.FL], bW);
     // F妻面: WR-WRU-FRU-FR
     const bF = wIsLeft ? bRight : bLeft;
     fillFaceNT([V.WR, V.WRU, V.FRU, V.FR], bF);
+    // 前面: FL-FR-FRU-FLU（一番手前）
+    fillFaceNT([V.FL, V.FR, V.FRU, V.FLU], bFront);
   }
 
   // ── ワイヤーフレーム ──
   vctx.save();
   vctx.strokeStyle = 'rgba(232,255,71,0.85)';
   vctx.lineWidth = 1.8; vctx.setLineDash([]);
-  // 壁面（奥）
+  // 壁面輪郭（奥）
   vctx.beginPath();
   vctx.moveTo(sx(V.WL),sy(V.WL)); vctx.lineTo(sx(V.WLU),sy(V.WLU));
   vctx.lineTo(sx(V.WRU),sy(V.WRU)); vctx.lineTo(sx(V.WR),sy(V.WR));
   vctx.closePath(); vctx.stroke();
-  // 前面
+  // 前面輪郭
   vctx.beginPath();
   vctx.moveTo(sx(V.FL),sy(V.FL)); vctx.lineTo(sx(V.FLU),sy(V.FLU));
   vctx.lineTo(sx(V.FRU),sy(V.FRU)); vctx.lineTo(sx(V.FR),sy(V.FR));
   vctx.closePath(); vctx.stroke();
-  // 繋ぎ線
-  [[V.WL,V.FL],[V.WR,V.FR],[V.WLU,V.FLU],[V.WRU,V.FRU]].forEach(([a,b])=>{
+  // 流れ面の稜線（WL-FL, WR-FR）
+  [[V.WL,V.FL],[V.WR,V.FR]].forEach(([a,b])=>{
+    vctx.beginPath(); vctx.moveTo(sx(a),sy(a)); vctx.lineTo(sx(b),sy(b)); vctx.stroke();
+  });
+  // 妻面の縦線（WLU-FLU, WRU-FRU）
+  [[V.WLU,V.FLU],[V.WRU,V.FRU]].forEach(([a,b])=>{
     vctx.beginPath(); vctx.moveTo(sx(a),sy(a)); vctx.lineTo(sx(b),sy(b)); vctx.stroke();
   });
   vctx.restore();
@@ -1975,7 +1976,10 @@ function updatePointCount() {
   document.getElementById('point-count').textContent = points.length;
 }
 function updateApplyBtn() {
-  document.getElementById('apply-btn').disabled = !(srcImg && points.length >= 3 && currentFabric);
+  const ok = appMode === 'new'
+    ? (ntVerts && currentFabric)
+    : (srcImg && points.length >= 3 && currentFabric);
+  document.getElementById('apply-btn').disabled = !ok;
 }
 
 /* ============================================================
