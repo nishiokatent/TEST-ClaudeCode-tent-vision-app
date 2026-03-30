@@ -866,8 +866,8 @@ function renderNewTent() {
     }
 
     // 描画順：奥→手前（流れ面→妻面→前面）
-    // 流れ面: WL-WR-FR-FL（上面）
-    fillFaceNT([V.WL, V.WR, V.FR, V.FL], bNagare);
+    // 流れ面: 上面全体を8点で囲む（WL-WLU-WRU-WR-FR-FRU-FLU-FL）
+    fillFaceNT([V.WL, V.WLU, V.WRU, V.WR, V.FR, V.FRU, V.FLU, V.FL], bNagare);
     // W妻面: WL-WLU-FLU-FL
     const bW = wIsLeft ? bLeft : bRight;
     fillFaceNT([V.WL, V.WLU, V.FLU, V.FL], bW);
@@ -2033,21 +2033,42 @@ function renderOffscreen() {
 
   if (appMode === 'new' && ntVerts && ntApplied && currentFabric) {
     const V = ntVerts;
-    // 上面
-    fillFace(() => {
-      oc.moveTo(V.FLT.x,V.FLT.y); oc.lineTo(V.FRT.x,V.FRT.y);
-      oc.lineTo(V.BRT.x,V.BRT.y); oc.lineTo(V.BLT.x,V.BLT.y);
-    }, opacity * 0.85);
-    // 前妻面
-    fillFace(() => {
-      oc.moveTo(V.FL.x,V.FL.y); oc.lineTo(V.FR.x,V.FR.y);
-      oc.lineTo(V.FRT.x,V.FRT.y); oc.lineTo(V.FLT.x,V.FLT.y);
-    }, opacity);
-    // 奥妻面
-    fillFace(() => {
-      oc.moveTo(V.BL.x,V.BL.y); oc.lineTo(V.BR.x,V.BR.y);
-      oc.lineTo(V.BRT.x,V.BRT.y); oc.lineTo(V.BLT.x,V.BLT.y);
-    }, opacity * 0.75);
+    const [r,g,b] = boostedColor(currentFabric.r, currentFabric.g, currentFabric.b, blend);
+    const bNagare = +document.getElementById('nt-bright-nagare').value;
+    const bFront  = +document.getElementById('nt-bright-front').value;
+    const bLeft   = +document.getElementById('nt-bright-left').value;
+    const bRight  = +document.getElementById('nt-bright-right').value;
+    const wIsLeft = V._wIsLeft;
+    const iw = srcImg.width, ih = srcImg.height;
+
+    function fillFaceNTOff(pts, bright) {
+      oc.save();
+      oc.beginPath();
+      oc.moveTo(pts[0].x, pts[0].y);
+      pts.slice(1).forEach(p => oc.lineTo(p.x, p.y));
+      oc.closePath(); oc.clip();
+      oc.globalCompositeOperation = 'source-over';
+      oc.globalAlpha = 1;
+      oc.fillStyle = `rgb(${r},${g},${b})`;
+      oc.fillRect(0, 0, iw, ih);
+      if (Math.abs(bright) >= 1) {
+        oc.globalAlpha = Math.abs(bright) / 100;
+        oc.fillStyle = bright > 0 ? '#ffffff' : '#000000';
+        oc.fillRect(0, 0, iw, ih);
+      }
+      oc.restore();
+    }
+
+    // 流れ面（8点で全上面カバー）
+    fillFaceNTOff([V.WL,V.WLU,V.WRU,V.WR,V.FR,V.FRU,V.FLU,V.FL], bNagare);
+    // W妻面
+    const bW = wIsLeft ? bLeft : bRight;
+    fillFaceNTOff([V.WL,V.WLU,V.FLU,V.FL], bW);
+    // F妻面
+    const bF = wIsLeft ? bRight : bLeft;
+    fillFaceNTOff([V.WR,V.WRU,V.FRU,V.FR], bF);
+    // 前面
+    fillFaceNTOff([V.FL,V.FR,V.FRU,V.FLU], bFront);
   } else if (appMode === 'replace' && currentFabric && points.length >= 3) {
     fillFace(() => {
       oc.moveTo(points[0].x, points[0].y);
